@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune - Extension Twitch</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦉</text></svg>">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+        h1 { font-size: 2.5rem; color: #d4a842; margin-bottom: 8px; font-weight: 800; }
+        .subtitle { color: #8b949e; font-size: 1.1rem; margin-bottom: 32px; }
+        .links { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+        a {
+            display: inline-block;
+            padding: 14px 28px;
+            background: #161b22;
+            color: #d4a842;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            border: 1px solid #30363d;
+            transition: all .2s;
+        }
+        a:hover { background: #1c2333; border-color: #d4a842; }
+        .credits { margin-top: 48px; font-size: .8rem; color: #8b949e; }
+        .credits a { background: none; border: none; padding: 0; color: #d4a842; display: inline; }
+    </style>
+</head>
+<body>
+    <h1>🦉 OnlyFaune</h1>
+    <p class="subtitle">Extension Twitch d'observation de la faune sauvage</p>
+    <div class="links">
+        <a href="admin.html">🎛️ Panneau Admin</a>
+        <a href="panel.html">📺 Extension Viewer</a>
+    </div>
+    <p class="credits">
+        Données espèces : <a href="https://fr.wikipedia.org">Wikipédia</a> (CC BY-SA) ·
+        Photos : <a href="https://commons.wikimedia.org">Wikimedia Commons</a> ·
+        Cartographie : <a href="https://www.openstreetmap.org">OpenStreetMap</a>
+    </p>
+</body>
+</html>

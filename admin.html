@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OnlyFaune - Admin</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦉</text></svg>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --bg-elevated: #1c2333;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-dim: #8b949e;
+            --gold: #d4a842;
+            --gold-bright: #f0c850;
+            --green: #2d6a4f;
+            --green-bright: #40916c;
+            --red: #da3633;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100dvh;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 12px;
+        }
+
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .header h1 { font-size: 1.3rem; color: var(--gold); font-weight: 800; letter-spacing: -0.02em; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+
+        .status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status.offline { background: rgba(139,148,158,0.12); color: var(--text-dim); }
+        .status.live { background: rgba(212,168,66,0.15); color: var(--gold); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+
+        main { max-width: 960px; margin: 0 auto; padding: 16px; }
+
+        h2 { color: var(--gold); font-size: 1.15rem; margin-bottom: 16px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group > label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--gold); font-size: 0.9rem; }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 11px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color .2s;
+        }
+        input:focus { border-color: var(--gold); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn-primary { background: var(--gold); color: #000; }
+        .btn-primary:hover { background: var(--gold-bright); }
+        .btn-secondary { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: rgba(218,54,51,0.12); color: var(--red); border: 1px solid rgba(218,54,51,0.3); }
+        .btn-large { width: 100%; padding: 14px; font-size: 1.1rem; border-radius: var(--radius); }
+        .btn-small { padding: 5px 10px; font-size: 0.8rem; }
+
+        .location-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .location-row input { flex: 1; }
+
+        .map-wrap { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
+        #map, #map-active { height: 220px; width: 100%; }
+
+        .session-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 16px;
+        }
+        .session-bar h2 { margin: 0; flex: 1; min-width: 120px; }
+        .session-bar .meta { color: var(--text-dim); font-size: 0.85rem; }
+        .session-bar .counter { background: var(--green); color: #fff; padding: 4px 12px; border-radius: 16px; font-weight: 700; font-size: 0.9rem; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--bg-card); border-radius: var(--radius); padding: 4px; }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            transition: all .15s;
+            border: none;
+            background: none;
+        }
+        .tab.active { background: var(--bg-elevated); color: var(--gold); }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px;
+            border-radius: 24px;
+            margin-bottom: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .search-input:focus { border-color: var(--gold); }
+
+        .cat-actions { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        .cat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            margin-top: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+        .cat-header h3 { color: var(--gold); font-size: 0.85rem; text-transform: uppercase; letter-spacing: .04em; }
+        .cat-header .badge { background: var(--bg-elevated); padding: 2px 9px; border-radius: 10px; font-size: 0.75rem; color: var(--text-dim); }
+        .cat-header .btn { margin-left: auto; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 10px; margin-bottom: 14px; }
+
+        .card {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all .2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+        .card:active { transform: scale(.97); }
+        .card.selected { border-color: var(--green); }
+        .card.observed { border-color: var(--gold); box-shadow: 0 0 16px rgba(212,168,66,.15); }
+        .card.just-observed { animation: flash .6s ease; }
+
+        @keyframes flash {
+            0% { box-shadow: 0 0 0 rgba(212,168,66,0); }
+            30% { box-shadow: 0 0 30px rgba(212,168,66,.5); border-color: var(--gold-bright); }
+            100% { box-shadow: 0 0 16px rgba(212,168,66,.15); }
+        }
+
+        .card .thumb {
+            width: 100%;
+            height: 90px;
+            object-fit: cover;
+            background: var(--bg-elevated);
+            display: block;
+        }
+        .card .thumb-placeholder {
+            width: 100%;
+            height: 90px;
+            background: var(--bg-elevated);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .card .info { padding: 6px 8px; flex: 1; }
+        .card .name-fr { font-weight: 600; font-size: .82rem; line-height: 1.2; }
+        .card .name-latin { font-size: .7rem; color: var(--text-dim); font-style: italic; }
+        .card .obs-badge {
+            display: inline-block;
+            background: var(--gold);
+            color: #000;
+            padding: 1px 7px;
+            border-radius: 8px;
+            font-size: .7rem;
+            font-weight: 700;
+            margin-top: 3px;
+        }
+
+        .card .toggle-bar {
+            padding: 6px 8px;
+            border-top: 1px solid var(--border);
+            font-size: .8rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+        .card.selected .toggle-bar { color: var(--green-bright); font-weight: 600; }
+
+        .btn-observe {
+            display: block;
+            width: calc(100% - 12px);
+            margin: 0 6px 6px;
+            padding: 10px;
+            background: var(--green);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: .9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .15s;
+            touch-action: manipulation;
+        }
+        .btn-observe:active { background: var(--green-bright); transform: scale(.96); }
+        .card.observed .btn-observe { background: var(--bg-elevated); color: var(--text-dim); font-weight: 400; }
+
+        .log { background: var(--bg-card); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); margin-top: 24px; }
+        .log h3 { color: var(--gold); margin-bottom: 10px; font-size: .95rem; }
+        .log-empty { color: var(--text-dim); font-size: .9rem; }
+        .log-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: .9rem;
+        }
+        .log-item:last-child { border-bottom: none; }
+        .log-item .time { color: var(--text-dim); font-size: .82rem; min-width: 45px; font-variant-numeric: tabular-nums; }
+        .log-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+
+        .history-grid { margin-top: 12px; }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+        }
+        .history-item .thumb-sm {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: var(--bg-elevated);
+        }
+        .history-item .details { flex: 1; }
+        .history-item .h-name { font-weight: 600; font-size: .9rem; }
+        .history-item .h-meta { font-size: .78rem; color: var(--text-dim); }
+        .history-item .h-count { font-weight: 700; color: var(--gold); font-size: .95rem; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120px);
+            background: var(--gold);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: var(--radius);
+            font-weight: 700;
+            font-size: 1rem;
+            z-index: 200;
+            transition: transform .3s ease;
+            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+            text-align: center;
+            max-width: 90%;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 500px) {
+            .grid { grid-template-columns: repeat(2, 1fr); }
+            .header { flex-wrap: wrap; }
+            .location-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-brand">
+            <h1>OnlyFaune</h1>
+        </div>
+        <div class="header-right">
+            <div id="status" class="status offline">Hors session</div>
+            <button id="btn-end" class="btn btn-danger btn-small hidden">Terminer</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ====== NEW SESSION ====== -->
+        <section id="view-new">
+            <h2>Nouvelle session d'observation</h2>
+
+            <div class="form-group">
+                <label for="inp-title">Titre de la session</label>
+                <input type="text" id="inp-title" placeholder="Ex : Forêt de Chizé – Aube">
+            </div>
+
+            <div class="form-group">
+                <label>Localisation</label>
+                <div class="location-row">
+                    <button id="btn-gps" class="btn btn-secondary">📍 Ma position</button>
+                    <input type="text" id="inp-location" placeholder="Nom du lieu">
+                </div>
+                <div class="map-wrap"><div id="map"></div></div>
+            </div>
+
+            <div class="form-group">
+                <label>Espèces attendues</label>
+                <input type="text" class="search-input" id="search-new" placeholder="Rechercher une espèce…">
+                <div class="cat-actions">
+                    <button class="btn btn-small btn-secondary" data-act="select-all">Tout sélectionner</button>
+                    <button class="btn btn-small btn-secondary" data-act="deselect-all">Tout désélectionner</button>
+                </div>
+                <div id="species-select"></div>
+            </div>
+
+            <button id="btn-start" class="btn btn-primary btn-large">Démarrer la session</button>
+        </section>
+
+        <!-- ====== ACTIVE SESSION ====== -->
+        <section id="view-active" class="hidden">
+            <div class="session-bar">
+                <h2 id="s-title"></h2>
+                <span class="meta" id="s-location"></span>
+                <span class="meta" id="s-timer"></span>
+                <span class="counter" id="s-count">0/0</span>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="observe">Observer</button>
+                <button class="tab" data-tab="map">Carte</button>
+                <button class="tab" data-tab="history">Historique</button>
+            </div>
+
+            <!-- Tab: Observer -->
+            <div id="tab-observe">
+                <input type="text" class="search-input" id="search-active" placeholder="Rechercher…">
+                <div id="species-grid"></div>
+                <div class="log" id="obs-log">
+                    <h3>Journal</h3>
+                    <div id="obs-list"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Map -->
+            <div id="tab-map" class="hidden">
+                <div class="map-wrap"><div id="map-active"></div></div>
+            </div>
+
+            <!-- Tab: History (all-time) -->
+            <div id="tab-history" class="hidden">
+                <h2>Toutes mes observations</h2>
+                <p class="meta" id="history-summary"></p>
+                <div id="history-list" class="history-grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Modal: species detail -->
+    <div id="modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:var(--bg-card);border-radius:var(--radius);padding:20px;max-width:440px;width:100%;max-height:80dvh;overflow-y:auto;border:1px solid var(--border);position:relative;">
+            <button id="modal-close" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text-dim);font-size:1.4rem;cursor:pointer;">&times;</button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const $ = s => document.querySelector(s);
+        const $$ = s => [...document.querySelectorAll(s)];
+
+        let session = null;
+        let allSpecies = [];
+        let sessionIds = new Set();
+        let obs = [];
+        let thumbs = {};
+        let map = null, mapActive = null, marker = null, markerActive = null;
+        let loc = null;
+        let selected = new Set();
+        let timer = null;
+
+        // ── Init ──
+        async function init() {
+            allSpecies = await loadSpecies();
+            await fetchThumbs();
+            session = await getActiveSession();
+            if (session) {
+                sessionIds = await loadSessionSpecies(session.id);
+                obs = await loadObs(session.id);
+                showActive();
+            } else {
+                showNew();
+            }
+            setupRealtime();
+            setupEvents();
+        }
+
+        // ── Data ──
+        async function loadSpecies() {
+            const { data } = await supabase.from('species').select('*').order('subcategory').order('name_fr');
+            return data || [];
+        }
+
+        async function getActiveSession() {
+            const { data } = await supabase.from('observation_sessions').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+            return data;
+        }
+
+        async function loadSessionSpecies(sid) {
+            const { data } = await supabase.from('session_species').select('species_id').eq('session_id', sid);
+            return new Set((data || []).map(d => d.species_id));
+        }
+
+        async function loadObs(sid) {
+            const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin)').eq('session_id', sid).order('observed_at', { ascending: false });
+            return data || [];
+        }
+
+        // ── Thumbnails (Wikipedia API) ──
+        async function fetchThumbs() {
+            const entries = allSpecies.filter(s => s.source_url).map(s => {
+                const m = s.source_url.match(/\/wiki\/(.+)$/);
+                return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
+            }).filter(Boolean);
+            if (!entries.length) return;
+
+            for (let i = 0; i < entries.length; i += 50) {
+                const batch = entries.slice(i, i + 50);
+                try {
+                    const titles = batch.map(e => e.title).join('|');
+                    const resp = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=pageimages&format=json&pithumbsize=300&origin=*`);
+                    const json = await resp.json();
+                    if (!json.query?.pages) continue;
+                    const byTitle = {};
+                    for (const p of Object.values(json.query.pages)) {
+                        if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
+                    }
+                    for (const e of batch) {
+                        const key = e.title.replace(/_/g, ' ');
+                        if (byTitle[key]) thumbs[e.id] = byTitle[key];
+                    }
+                } catch (err) { console.warn('Thumb fetch error', err); }
+            }
+        }
+
+        function getThumb(sp) {
+            return thumbs[sp.id] || sp.photo_url || null;
+        }
+
+        function thumbHtml(sp, cls = 'thumb') {
+            const url = getThumb(sp);
+            if (url) return `<img class="${cls}" src="${url}" alt="${sp.name_fr}" loading="lazy">`;
+            return `<div class="${cls === 'thumb' ? 'thumb-placeholder' : cls}" style="display:flex;align-items:center;justify-content:center;background:var(--bg-elevated);${cls === 'thumb-sm' ? 'width:40px;height:40px;border-radius:8px;font-size:1.2rem;' : ''}">${sp.category === 'bird' ? '🐦' : '🦊'}</div>`;
+        }
+
+        // ── Sessions ──
+        async function startSession() {
+            const title = $('#inp-title').value.trim();
+            if (!title) { toast('Entrez un titre'); return; }
+
+            const { data, error } = await supabase.from('observation_sessions').insert({
+                title,
+                location_name: $('#inp-location').value.trim() || null,
+                latitude: loc?.lat || null,
+                longitude: loc?.lng || null,
+            }).select().single();
+
+            if (error) { toast('Erreur : ' + error.message); return; }
+            session = data;
+
+            if (selected.size) {
+                const rows = [...selected].map((sid, i) => ({ session_id: session.id, species_id: sid, sort_order: i }));
+                await supabase.from('session_species').insert(rows);
+                sessionIds = new Set(selected);
+            }
+
+            obs = [];
+            showActive();
+            toast('Session démarrée !');
+        }
+
+        async function endSession() {
+            if (!confirm('Terminer la session ?')) return;
+            await supabase.from('observation_sessions').update({ is_active: false, ended_at: new Date().toISOString() }).eq('id', session.id);
+            session = null;
+            sessionIds.clear();
+            obs = [];
+            selected.clear();
+            clearInterval(timer);
+            showNew();
+        }
+
+        // ── Observe ──
+        async function observe(speciesId) {
+            const { data, error } = await supabase.from('observations').insert({ session_id: session.id, species_id: speciesId }).select('*, species:species_id(name_fr, name_latin)').single();
+            if (error) { toast('Erreur'); return; }
+            obs.unshift(data);
+            renderGrid();
+            renderLog();
+
+            const sp = allSpecies.find(s => s.id === speciesId);
+            toast(`${sp?.name_fr || 'Espèce'} observé(e) !`);
+
+            const card = document.querySelector(`.card[data-id="${speciesId}"]`);
+            if (card) { card.classList.add('just-observed'); setTimeout(() => card.classList.remove('just-observed'), 1500); }
+        }
+
+        // ── Views ──
+        function showNew() {
+            $('#view-new').classList.remove('hidden');
+            $('#view-active').classList.add('hidden');
+            $('#status').className = 'status offline';
+            $('#status').textContent = 'Hors session';
+            $('#btn-end').classList.add('hidden');
+            renderSelection();
+            setTimeout(() => initMap(), 50);
+        }
+
+        function showActive() {
+            $('#view-new').classList.add('hidden');
+            $('#view-active').classList.remove('hidden');
+            $('#status').className = 'status live';
+            $('#status').textContent = '● EN DIRECT';
+            $('#btn-end').classList.remove('hidden');
+            $('#s-title').textContent = session.title;
+            $('#s-location').textContent = session.location_name || '';
+            startTimer();
+            renderGrid();
+            renderLog();
+        }
+
+        // ── Render: species selection (new session) ──
+        function renderSelection(filter = '') {
+            const container = $('#species-select');
+            const grouped = groupBy(allSpecies, filter);
+            let html = '';
+            for (const [cat, sps] of Object.entries(grouped)) {
+                const selCount = sps.filter(s => selected.has(s.id)).length;
+                html += `<div class="cat-header"><h3>${cat}</h3><span class="badge">${selCount}/${sps.length}</span><button class="btn btn-small btn-secondary" data-act="toggle-cat" data-cat="${cat}">Basculer</button></div><div class="grid">`;
+                for (const sp of sps) {
+                    const sel = selected.has(sp.id);
+                    html += `<div class="card ${sel ? 'selected' : ''}" data-id="${sp.id}" data-act="toggle-select">${thumbHtml(sp)}<div class="info"><div class="name-fr">${sp.name_fr}</div><div class="name-latin">${sp.name_latin}</div></div><div class="toggle-bar">${sel ? '✓ Sélectionné' : '+ Ajouter'}</div></div>`;
+                }
+                html += '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        // ── Render: active session grid ──
+        function renderGrid(filter = '') {
+            const container = $('#species-grid');
+            const inSession = allSpecies.filter(s => sessionIds.has(s.id));
+            const obsIds = new Set(obs.map(o => o.species_id));
+            const grouped = groupBy(inSession, filter);
+            let total = 0, seen = 0;
+
+            let html = '';
+            for (const [cat, sps] of Object.entries(grouped)) {
+                const catSeen = sps.filter(s => obsIds.has(s.id)).length;
+                total += sps.length;
+                seen += catSeen;
+                html += `<div class="cat-header"><h3>${cat}</h3><span class="badge">${catSeen}/${sps.length}</span></div><div class="grid">`;
+                for (const sp of sps) {
+                    const isObs = obsIds.has(sp.id);
+                    const last = obs.find(o => o.species_id === sp.id);
+                    const t = last ? new Date(last.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+                    html += `<div class="card ${isObs ? 'observed' : ''}" data-id="${sp.id}">${thumbHtml(sp)}<div class="info"><div class="name-fr">${sp.name_fr}</div><div class="name-latin">${sp.name_latin}</div>${isObs ? `<span class="obs-badge">✓ ${t}</span>` : ''}</div><button class="btn-observe" data-act="observe" data-id="${sp.id}">${isObs ? '↻ Revoir' : '✓ OBSERVÉ !'}</button></div>`;
+                }
+                html += '</div>';
+            }
+            container.innerHTML = html;
+            $('#s-count').textContent = `${seen}/${total}`;
+        }
+
+        // ── Render: observation log ──
+        function renderLog() {
+            const container = $('#obs-list');
+            if (!obs.length) { container.innerHTML = '<p class="log-empty">En attente de la première observation…</p>'; return; }
+            container.innerHTML = obs.slice(0, 30).map(o => {
+                const t = new Date(o.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+                return `<div class="log-item"><span class="time">${t}</span><span class="dot"></span><span>${o.species?.name_fr || '?'}</span></div>`;
+            }).join('');
+        }
+
+        // ── Render: all-time history ──
+        async function renderHistory() {
+            const { data } = await supabase.from('observations').select('species_id, observed_at, species:species_id(id, name_fr, name_latin, category)').order('observed_at', { ascending: false });
+            if (!data || !data.length) {
+                $('#history-summary').textContent = 'Aucune observation enregistrée.';
+                $('#history-list').innerHTML = '';
+                return;
+            }
+
+            const bySpecies = {};
+            for (const o of data) {
+                const sid = o.species_id;
+                if (!bySpecies[sid]) bySpecies[sid] = { species: o.species, count: 0, first: o.observed_at, last: o.observed_at };
+                bySpecies[sid].count++;
+                if (o.observed_at < bySpecies[sid].first) bySpecies[sid].first = o.observed_at;
+                if (o.observed_at > bySpecies[sid].last) bySpecies[sid].last = o.observed_at;
+            }
+
+            const list = Object.values(bySpecies).sort((a, b) => b.count - a.count);
+            const uniqueCount = list.length;
+            const totalObs = data.length;
+
+            $('#history-summary').textContent = `${uniqueCount} espèces différentes · ${totalObs} observations au total`;
+
+            $('#history-list').innerHTML = list.map(item => {
+                const sp = allSpecies.find(s => s.id === item.species?.id) || item.species;
+                const dateStr = new Date(item.last).toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' });
+                return `<div class="history-item">${sp ? thumbHtml(sp, 'thumb-sm') : ''}<div class="details"><div class="h-name">${sp?.name_fr || '?'}</div><div class="h-meta">Dernière obs. : ${dateStr}</div></div><div class="h-count">${item.count}×</div></div>`;
+            }).join('');
+        }
+
+        // ── Map ──
+        function initMap() {
+            if (map) { map.remove(); map = null; }
+            const el = document.getElementById('map');
+            if (!el || el.offsetHeight === 0) return;
+            map = L.map('map').setView([46.5, 2.5], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            map.on('click', e => {
+                loc = e.latlng;
+                if (marker) marker.remove();
+                marker = L.marker(e.latlng).addTo(map);
+            });
+            setTimeout(() => map.invalidateSize(), 200);
+        }
+
+        function initMapActive() {
+            if (mapActive) { mapActive.remove(); mapActive = null; }
+            const el = document.getElementById('map-active');
+            if (!el) return;
+            const lat = session?.latitude || 46.5;
+            const lng = session?.longitude || 2.5;
+            const zoom = session?.latitude ? 13 : 6;
+            mapActive = L.map('map-active').setView([lat, lng], zoom);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapActive);
+            if (session?.latitude) {
+                markerActive = L.marker([lat, lng]).addTo(mapActive).bindPopup(session.location_name || 'Position').openPopup();
+            }
+            setTimeout(() => mapActive.invalidateSize(), 200);
+        }
+
+        function useGPS() {
+            if (!navigator.geolocation) { toast('GPS non disponible'); return; }
+            toast('Recherche GPS…');
+            navigator.geolocation.getCurrentPosition(pos => {
+                loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (map) {
+                    map.setView([loc.lat, loc.lng], 14);
+                    if (marker) marker.remove();
+                    marker = L.marker([loc.lat, loc.lng]).addTo(map);
+                }
+                toast('Position trouvée !');
+            }, err => toast('Erreur GPS : ' + err.message), { enableHighAccuracy: true, timeout: 15000 });
+        }
+
+        // ── Timer ──
+        function startTimer() {
+            const start = new Date(session.started_at).getTime();
+            const update = () => {
+                const d = Date.now() - start;
+                const h = Math.floor(d / 3600000);
+                const m = Math.floor((d % 3600000) / 60000);
+                $('#s-timer').textContent = `${h}h${String(m).padStart(2, '0')}`;
+            };
+            update();
+            timer = setInterval(update, 30000);
+        }
+
+        // ── Realtime ──
+        function setupRealtime() {
+            supabase.channel('obs-rt').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'observations' }, async payload => {
+                if (!session || payload.new.session_id !== session.id) return;
+                if (obs.find(o => o.id === payload.new.id)) return;
+                const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin)').eq('id', payload.new.id).single();
+                if (data) {
+                    obs.unshift(data);
+                    renderGrid();
+                    renderLog();
+                }
+            }).subscribe();
+        }
+
+        // ── Events ──
+        function setupEvents() {
+            $('#btn-start').onclick = startSession;
+            $('#btn-end').onclick = endSession;
+            $('#btn-gps').onclick = useGPS;
+            $('#modal-close').onclick = () => $('#modal').classList.add('hidden');
+            $('#modal').onclick = e => { if (e.target === $('#modal')) $('#modal').classList.add('hidden'); };
+
+            $('#search-new').oninput = e => renderSelection(e.target.value.toLowerCase());
+            $('#search-active').oninput = e => renderGrid(e.target.value.toLowerCase());
+
+            // Tabs
+            $$('.tab').forEach(tab => tab.onclick = () => {
+                $$('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const name = tab.dataset.tab;
+                ['observe', 'map', 'history'].forEach(n => {
+                    const el = $(`#tab-${n}`);
+                    if (el) el.classList.toggle('hidden', n !== name);
+                });
+                if (name === 'map') setTimeout(() => initMapActive(), 50);
+                if (name === 'history') renderHistory();
+            });
+
+            // Delegated clicks
+            document.addEventListener('click', e => {
+                const btn = e.target.closest('[data-act]');
+                if (!btn) return;
+                const act = btn.dataset.act;
+                const id = btn.dataset.id || btn.closest('[data-id]')?.dataset.id;
+                const cat = btn.dataset.cat;
+
+                if (act === 'toggle-select' && id) {
+                    selected.has(id) ? selected.delete(id) : selected.add(id);
+                    renderSelection($('#search-new').value.toLowerCase());
+                } else if (act === 'toggle-cat' && cat) {
+                    const catSps = allSpecies.filter(s => s.subcategory === cat);
+                    const allSel = catSps.every(s => selected.has(s.id));
+                    catSps.forEach(s => allSel ? selected.delete(s.id) : selected.add(s.id));
+                    renderSelection($('#search-new').value.toLowerCase());
+                } else if (act === 'select-all') {
+                    allSpecies.forEach(s => selected.add(s.id));
+                    renderSelection($('#search-new').value.toLowerCase());
+                } else if (act === 'deselect-all') {
+                    selected.clear();
+                    renderSelection($('#search-new').value.toLowerCase());
+                } else if (act === 'observe' && id) {
+                    e.stopPropagation();
+                    observe(id);
+                } else if (act === 'detail' && id) {
+                    showDetail(id);
+                }
+            });
+
+            // Card click → detail
+            document.addEventListener('click', e => {
+                const card = e.target.closest('.card');
+                if (!card || e.target.closest('[data-act="observe"]') || e.target.closest('[data-act="toggle-select"]')) return;
+                if (card.dataset.id && session) showDetail(card.dataset.id);
+            });
+        }
+
+        // ── Detail modal ──
+        function showDetail(id) {
+            const sp = allSpecies.find(s => s.id === id);
+            if (!sp) return;
+            const url = getThumb(sp);
+            const imgHtml = url ? `<img src="${url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:12px;">` : '';
+            const fields = [
+                ['Habitat', sp.habitat],
+                ['Taille', sp.size],
+                ['Poids', sp.weight],
+                ['Régime', sp.diet],
+                ['Comportement', sp.behavior],
+                ['Statut UICN', sp.conservation_status],
+            ].filter(([, v]) => v);
+
+            $('#modal-body').innerHTML = `
+                ${imgHtml}
+                <h2 style="color:var(--gold);margin-bottom:2px;">${sp.name_fr}</h2>
+                <p style="color:var(--text-dim);font-style:italic;margin-bottom:12px;">${sp.name_latin}</p>
+                ${sp.description ? `<p style="margin-bottom:12px;">${sp.description}</p>` : ''}
+                ${fields.map(([l, v]) => `<p style="margin-bottom:6px;"><strong style="color:var(--gold);">${l} :</strong> ${v}</p>`).join('')}
+                ${sp.source_url ? `<a href="${sp.source_url}" target="_blank" rel="noopener" style="color:var(--gold);font-size:.85rem;">Voir sur Wikipédia →</a>` : ''}
+                <p style="margin-top:10px;font-size:.75rem;color:var(--text-dim);">Photo : ${sp.photo_credit || 'Wikimedia Commons'}</p>
+            `;
+            $('#modal').classList.remove('hidden');
+        }
+
+        // ── Helpers ──
+        function groupBy(species, filter = '') {
+            const groups = {};
+            for (const sp of species) {
+                if (filter && !sp.name_fr.toLowerCase().includes(filter) && !sp.name_latin.toLowerCase().includes(filter)) continue;
+                const key = sp.subcategory || 'Autre';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(sp);
+            }
+            return groups;
+        }
+
+        function toast(msg) {
+            const el = $('#toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2500);
+        }
+
+        // ── Start ──
+        init();
+    </script>
+</body>
+</html>
