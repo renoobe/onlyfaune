@@ -336,7 +336,8 @@
             </div>
 
             <div class="form-group">
-                <label>Localisation — cliquez sur la carte</label>
+                <label>Localisation</label>
+                <input type="text" id="inp-location" placeholder="Ex : Parc régional du Poitou" style="margin-bottom:8px;">
                 <div class="map-wrap"><div id="map"></div></div>
             </div>
 
@@ -506,7 +507,7 @@
 
             const { data, error } = await supabase.from('observation_sessions').insert({
                 title,
-                location_name: null,
+                location_name: $('#inp-location').value.trim() || null,
                 latitude: loc?.lat || null,
                 longitude: loc?.lng || null,
             }).select().single();
@@ -569,7 +570,7 @@
             $('#status').textContent = '● EN DIRECT';
             $('#btn-end').classList.remove('hidden');
             $('#s-title').textContent = session.title;
-            $('#s-location').textContent = session.latitude ? '📍 Position définie' : '';
+            $('#s-location').textContent = session.location_name || '';
             startTimer();
             renderGrid();
             renderLog();

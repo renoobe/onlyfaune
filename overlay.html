@@ -173,6 +173,19 @@
         @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
 
 
+        .panel-intro {
+            padding: 10px 14px;
+            background: rgba(232,184,75,.06);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .panel-intro p {
+            font-size: .75rem;
+            color: var(--text-dim);
+            line-height: 1.4;
+            margin: 0;
+        }
+
         .no-session {
             text-align: center;
             padding: 40px 16px;
@@ -448,6 +461,9 @@
         <span class="logo">OnlyFaune</span>
         <span class="session-name" id="p-session-name">—</span>
         <span class="live-dot" id="p-live-dot" style="display:none;"></span>
+    </div>
+    <div class="panel-intro" id="panel-intro">
+        <p>Découvrez les espèces sauvages observables en direct. Cliquez sur une fiche pour en savoir plus !</p>
     </div>
 
     <div id="no-session" class="no-session">
