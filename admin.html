@@ -106,8 +106,6 @@
         .btn-large { width: 100%; padding: 14px; font-size: 1.1rem; border-radius: var(--radius); }
         .btn-small { padding: 5px 10px; font-size: 0.8rem; }
 
-        .location-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .location-row input { flex: 1; }
 
         .map-wrap { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
         #map, #map-active { height: 220px; width: 100%; }
@@ -313,7 +311,6 @@
         @media (max-width: 500px) {
             .grid { grid-template-columns: repeat(2, 1fr); }
             .header { flex-wrap: wrap; }
-            .location-row { flex-direction: column; }
         }
     </style>
 </head>
@@ -339,11 +336,7 @@
             </div>
 
             <div class="form-group">
-                <label>Localisation</label>
-                <div class="location-row">
-                    <button id="btn-gps" class="btn btn-secondary">📍 Ma position</button>
-                    <input type="text" id="inp-location" placeholder="Nom du lieu">
-                </div>
+                <label>Localisation — cliquez sur la carte</label>
                 <div class="map-wrap"><div id="map"></div></div>
             </div>
 
@@ -387,7 +380,9 @@
 
             <!-- Tab: Map -->
             <div id="tab-map" class="hidden">
+                <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px;">Cliquez sur la carte pour déplacer votre position.</p>
                 <div class="map-wrap"><div id="map-active"></div></div>
+                <button id="btn-update-loc" class="btn btn-primary btn-large hidden" style="margin-top:12px;">📍 Mettre à jour la position</button>
             </div>
 
             <!-- Tab: History (all-time) -->
@@ -511,7 +506,7 @@
 
             const { data, error } = await supabase.from('observation_sessions').insert({
                 title,
-                location_name: $('#inp-location').value.trim() || null,
+                location_name: null,
                 latitude: loc?.lat || null,
                 longitude: loc?.lng || null,
             }).select().single();
@@ -574,7 +569,7 @@
             $('#status').textContent = '● EN DIRECT';
             $('#btn-end').classList.remove('hidden');
             $('#s-title').textContent = session.title;
-            $('#s-location').textContent = session.location_name || '';
+            $('#s-location').textContent = session.latitude ? '📍 Position définie' : '';
             startTimer();
             renderGrid();
             renderLog();
@@ -679,6 +674,8 @@
             setTimeout(() => map.invalidateSize(), 200);
         }
 
+        let pendingLoc = null;
+
         function initMapActive() {
             if (mapActive) { mapActive.remove(); mapActive = null; }
             const el = document.getElementById('map-active');
@@ -686,27 +683,36 @@
             const lat = session?.latitude || 46.5;
             const lng = session?.longitude || 2.5;
             const zoom = session?.latitude ? 13 : 6;
+            pendingLoc = null;
+            $('#btn-update-loc').classList.add('hidden');
             mapActive = L.map('map-active').setView([lat, lng], zoom);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapActive);
             if (session?.latitude) {
-                markerActive = L.marker([lat, lng]).addTo(mapActive).bindPopup(session.location_name || 'Position').openPopup();
+                markerActive = L.marker([lat, lng]).addTo(mapActive).bindPopup('Position actuelle').openPopup();
             }
+            mapActive.on('click', e => {
+                pendingLoc = e.latlng;
+                if (markerActive) markerActive.remove();
+                markerActive = L.marker(e.latlng).addTo(mapActive).bindPopup('Nouvelle position').openPopup();
+                $('#btn-update-loc').classList.remove('hidden');
+            });
             setTimeout(() => mapActive.invalidateSize(), 200);
         }
 
-        function useGPS() {
-            if (!navigator.geolocation) { toast('GPS non disponible'); return; }
-            toast('Recherche GPS…');
-            navigator.geolocation.getCurrentPosition(pos => {
-                loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                if (map) {
-                    map.setView([loc.lat, loc.lng], 14);
-                    if (marker) marker.remove();
-                    marker = L.marker([loc.lat, loc.lng]).addTo(map);
-                }
-                toast('Position trouvée !');
-            }, err => toast('Erreur GPS : ' + err.message), { enableHighAccuracy: true, timeout: 15000 });
+        async function updateLocation() {
+            if (!pendingLoc || !session) return;
+            const { error } = await supabase.from('observation_sessions').update({
+                latitude: pendingLoc.lat,
+                longitude: pendingLoc.lng,
+            }).eq('id', session.id);
+            if (error) { toast('Erreur : ' + error.message); return; }
+            session.latitude = pendingLoc.lat;
+            session.longitude = pendingLoc.lng;
+            pendingLoc = null;
+            $('#btn-update-loc').classList.add('hidden');
+            toast('Position mise à jour !');
         }
+
 
         // ── Timer ──
         function startTimer() {
@@ -739,7 +745,7 @@
         function setupEvents() {
             $('#btn-start').onclick = startSession;
             $('#btn-end').onclick = endSession;
-            $('#btn-gps').onclick = useGPS;
+            $('#btn-update-loc').onclick = updateLocation;
             $('#modal-close').onclick = () => $('#modal').classList.add('hidden');
             $('#modal').onclick = e => { if (e.target === $('#modal')) $('#modal').classList.add('hidden'); };
 
