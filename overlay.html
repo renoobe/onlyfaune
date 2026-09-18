@@ -31,7 +31,7 @@
             overflow: hidden;
         }
 
-        /* ── Toggle button — middle left ── */
+        /* ── Toggle button — middle left, slides with panel ── */
         .toggle-btn {
             position: fixed;
             left: 10px;
@@ -49,8 +49,8 @@
             align-items: center;
             justify-content: center;
             z-index: 200;
-            transition: all .25s cubic-bezier(.4,0,.2,1);
-            box-shadow: 0 4px 24px rgba(0,0,0,.5), 0 0 0 0 rgba(232,184,75,0);
+            transition: all .4s cubic-bezier(.16,1,.3,1);
+            box-shadow: 0 4px 24px rgba(0,0,0,.5);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
@@ -60,11 +60,25 @@
             box-shadow: 0 4px 24px rgba(0,0,0,.5), 0 0 20px rgba(232,184,75,.25);
         }
         .toggle-btn.active {
-            background: var(--gold);
-            color: #000;
-            border-color: var(--gold-bright);
-            box-shadow: 0 4px 24px rgba(0,0,0,.5), 0 0 24px rgba(232,184,75,.4);
+            left: 344px;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.08);
+            border-color: rgba(255,255,255,.15);
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,.4);
         }
+        .toggle-btn.active:hover {
+            background: rgba(255,255,255,.14);
+            color: var(--text);
+            transform: translateY(-50%) scale(1.05);
+        }
+        .toggle-btn .btn-icon-close { display: none; }
+        .toggle-btn .btn-icon-open { display: block; }
+        .toggle-btn.active .btn-icon-close { display: block; }
+        .toggle-btn.active .btn-icon-open { display: none; }
         .toggle-btn .btn-label {
             position: absolute;
             left: 60px;
@@ -82,7 +96,8 @@
             transition: opacity .2s;
             letter-spacing: .03em;
         }
-        .toggle-btn:hover .btn-label { opacity: 1; }
+        .toggle-btn:not(.active):hover .btn-label { opacity: 1; }
+        .toggle-btn.active .btn-label { display: none; }
 
         .toggle-badge {
             position: absolute;
@@ -157,18 +172,6 @@
         }
         @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
 
-        .panel-header .close-btn {
-            background: rgba(255,255,255,.06);
-            border: 1px solid var(--border);
-            color: var(--text-dim);
-            font-size: 1rem;
-            cursor: pointer;
-            padding: 2px 8px;
-            border-radius: 6px;
-            line-height: 1;
-            transition: all .15s;
-        }
-        .panel-header .close-btn:hover { color: var(--text); background: rgba(255,255,255,.1); }
 
         .no-session {
             text-align: center;
@@ -433,7 +436,8 @@
 
 <!-- Toggle button -->
 <button class="toggle-btn" id="toggle-btn" title="OnlyFaune">
-    🦉
+    <span class="btn-icon-open">🦉</span>
+    <span class="btn-icon-close">✕</span>
     <span class="btn-label">OnlyFaune</span>
     <span class="toggle-badge" id="toggle-badge"></span>
 </button>
@@ -444,7 +448,6 @@
         <span class="logo">OnlyFaune</span>
         <span class="session-name" id="p-session-name">—</span>
         <span class="live-dot" id="p-live-dot" style="display:none;"></span>
-        <button class="close-btn" id="close-btn">&times;</button>
     </div>
 
     <div id="no-session" class="no-session">
@@ -533,7 +536,6 @@
     }
 
     $('#toggle-btn').onclick = () => togglePanel();
-    $('#close-btn').onclick = () => togglePanel(false);
 
     async function init() {
         allSpecies = await loadSpecies();
