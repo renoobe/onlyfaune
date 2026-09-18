@@ -550,7 +550,7 @@
             renderLog();
 
             const sp = allSpecies.find(s => s.id === speciesId);
-            toast(`${sp?.name_fr || 'Espèce'} observé(e) !`);
+            toast(`${sp?.name_fr || 'Espèce'} vu(e) !`);
 
             const card = document.querySelector(`.card[data-id="${speciesId}"]`);
             if (card) { card.classList.add('just-observed'); setTimeout(() => card.classList.remove('just-observed'), 1500); }
@@ -615,7 +615,7 @@
                     const isObs = obsIds.has(sp.id);
                     const last = obs.find(o => o.species_id === sp.id);
                     const t = last ? new Date(last.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
-                    html += `<div class="card ${isObs ? 'observed' : ''}" data-id="${sp.id}">${thumbHtml(sp)}<div class="info"><div class="name-fr">${sp.name_fr}</div><div class="name-latin">${sp.name_latin}</div>${isObs ? `<span class="obs-badge">✓ ${t}</span>` : ''}</div><button class="btn-observe" data-act="observe" data-id="${sp.id}">${isObs ? '↻ Revoir' : '✓ OBSERVÉ !'}</button></div>`;
+                    html += `<div class="card ${isObs ? 'observed' : ''}" data-id="${sp.id}">${thumbHtml(sp)}<div class="info"><div class="name-fr">${sp.name_fr}</div><div class="name-latin">${sp.name_latin}</div>${isObs ? `<span class="obs-badge">✓ ${t}</span>` : ''}</div><button class="btn-observe" data-act="observe" data-id="${sp.id}">${isObs ? '↻ Revoir' : '✓ VU !'}</button></div>`;
                 }
                 html += '</div>';
             }

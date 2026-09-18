@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune - Guide d'utilisation</title>
+    <style>
+        @media print {
+            body { font-size: 11pt; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none; }
+            h1, h2, h3 { page-break-after: avoid; }
+            .step, .info-box { page-break-inside: avoid; }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #1a1a2e;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 32px;
+            background: #fff;
+        }
+
+        .cover {
+            text-align: center;
+            padding: 80px 0 60px;
+            border-bottom: 3px solid #d4a842;
+            margin-bottom: 40px;
+        }
+        .cover .emoji { font-size: 4rem; margin-bottom: 16px; display: block; }
+        .cover h1 { font-size: 2.4rem; color: #1a1a2e; margin-bottom: 8px; }
+        .cover .subtitle { font-size: 1.2rem; color: #666; margin-bottom: 24px; }
+        .cover .version { font-size: 0.85rem; color: #999; }
+
+        h2 {
+            font-size: 1.4rem;
+            color: #2d6a4f;
+            margin-top: 36px;
+            margin-bottom: 16px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #e8e8e8;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            color: #d4a842;
+            margin-top: 24px;
+            margin-bottom: 10px;
+        }
+
+        p { margin-bottom: 12px; }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #d4a842;
+        }
+        .step-number {
+            background: #d4a842;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+        .step-content { flex: 1; }
+        .step-content strong { color: #1a1a2e; }
+
+        .info-box {
+            padding: 14px 18px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .info-box.tip {
+            background: #e8f5e9;
+            border-left: 4px solid #2d6a4f;
+        }
+        .info-box.warning {
+            background: #fff3e0;
+            border-left: 4px solid #e65100;
+        }
+        .info-box.info {
+            background: #e3f2fd;
+            border-left: 4px solid #1565c0;
+        }
+        .info-box .box-title {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        ul, ol {
+            margin-bottom: 12px;
+            padding-left: 24px;
+        }
+        li { margin-bottom: 6px; }
+
+        .shortcut {
+            display: inline-block;
+            background: #e8e8e8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .feature-card {
+            padding: 14px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e8e8e8;
+        }
+        .feature-card .feat-icon { font-size: 1.5rem; margin-bottom: 6px; display: block; }
+        .feature-card .feat-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+        .feature-card .feat-desc { font-size: 0.82rem; color: #666; }
+
+        .toc {
+            background: #f8f9fa;
+            padding: 20px 24px;
+            border-radius: 10px;
+            margin-bottom: 32px;
+        }
+        .toc h3 { margin-top: 0; color: #1a1a2e; }
+        .toc ol { margin-bottom: 0; }
+        .toc li { color: #2d6a4f; font-weight: 500; }
+
+        .url-box {
+            background: #1a1a2e;
+            color: #e6edf3;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+
+        .footer-doc {
+            margin-top: 48px;
+            padding-top: 20px;
+            border-top: 2px solid #e8e8e8;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .btn-print {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #d4a842;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,.2);
+        }
+        .btn-print:hover { background: #c49835; }
+    </style>
+</head>
+<body>
+
+<button class="btn-print no-print" onclick="window.print()">Imprimer / PDF</button>
+
+<div class="cover">
+    <span class="emoji">🦉</span>
+    <h1>OnlyFaune</h1>
+    <p class="subtitle">Guide d'utilisation de l'extension Twitch</p>
+    <p class="version">Version 1.0 — Septembre 2026</p>
+</div>
+
+<div class="toc">
+    <h3>Sommaire</h3>
+    <ol>
+        <li>Qu'est-ce que OnlyFaune ?</li>
+        <li>Avant de commencer</li>
+        <li>Panneau Admin — Cr&eacute;er une session</li>
+        <li>Panneau Admin — Pendant le stream</li>
+        <li>Ce que les viewers voient</li>
+        <li>Apr&egrave;s le stream</li>
+        <li>Acc&egrave;s &amp; liens utiles</li>
+    </ol>
+</div>
+
+<!-- ============================== -->
+<h2>1. Qu'est-ce que OnlyFaune ?</h2>
+
+<p>OnlyFaune est une extension Twitch conçue pour les streams d'observation de la faune sauvage. Elle permet de :</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <span class="feat-icon">📋</span>
+        <div class="feat-title">Guide des esp&egrave;ces</div>
+        <div class="feat-desc">Afficher les animaux susceptibles d'&ecirc;tre observ&eacute;s, avec photo, description et infos d&eacute;taill&eacute;es.</div>
+    </div>
+    <div class="feature-card">
+        <span class="feat-icon">✅</span>
+        <div class="feat-title">Observations en direct</div>
+        <div class="feat-desc">Signaler une observation en un tap — les viewers voient une alerte plein &eacute;cran en temps r&eacute;el.</div>
+    </div>
+    <div class="feature-card">
+        <span class="feat-icon">🗺️</span>
+        <div class="feat-title">Carte</div>
+        <div class="feat-desc">Montrer la zone d'observation sur une carte OpenStreetMap.</div>
+    </div>
+    <div class="feature-card">
+        <span class="feat-icon">📊</span>
+        <div class="feat-title">Statistiques</div>
+        <div class="feat-desc">Suivre les observations de la session et l'historique toutes sessions confondues.</div>
+    </div>
+</div>
+
+<p>L'extension se compose de <strong>deux interfaces</strong> :</p>
+<ul>
+    <li><strong>Le panneau Admin</strong> — utilis&eacute; par l'op&eacute;rateur (vous) sur iPad ou ordinateur pendant le stream</li>
+    <li><strong>Le panneau Viewer</strong> — visible par les spectateurs directement sur la page Twitch</li>
+</ul>
+
+<!-- ============================== -->
+<h2>2. Avant de commencer</h2>
+
+<h3>Ce dont vous avez besoin</h3>
+<ul>
+    <li>Un appareil connect&eacute; &agrave; Internet (iPad, t&eacute;l&eacute;phone ou ordinateur)</li>
+    <li>Un navigateur web (Safari, Chrome, Firefox...)</li>
+    <li>L'adresse du panneau admin (fournie par le streamer)</li>
+</ul>
+
+<h3>Acc&egrave;s au panneau admin</h3>
+<p>Ouvrez le lien suivant dans votre navigateur :</p>
+<div class="url-box"><a href="https://renoobe.github.io/onlyfaune/admin.html" target="_blank" rel="noopener" style="color:#d4a842;">https://renoobe.github.io/onlyfaune/admin.html</a></div>
+
+<div class="info-box tip">
+    <div class="box-title">Conseil iPad</div>
+    Ajoutez la page &agrave; l'&eacute;cran d'accueil pour un acc&egrave;s rapide : dans Safari, touchez l'ic&ocirc;ne de partage puis "Sur l'&eacute;cran d'accueil".
+</div>
+
+<!-- ============================== -->
+<div class="page-break"></div>
+<h2>3. Cr&eacute;er une session d'observation</h2>
+
+<p>Quand vous arrivez sur le panneau admin, vous voyez le formulaire de cr&eacute;ation de session.</p>
+
+<div class="step">
+    <div class="step-number">1</div>
+    <div class="step-content">
+        <strong>Titre de la session</strong><br>
+        Donnez un nom &agrave; votre session, par exemple : "For&ecirc;t de Chiz&eacute; — Aube" ou "Marais Poitevin — Nocturne".
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">2</div>
+    <div class="step-content">
+        <strong>Localisation</strong><br>
+        Deux options :
+        <ul style="margin-top:6px;">
+            <li>Bouton <strong>"Ma position"</strong> — utilise le GPS de votre appareil (le navigateur demandera l'autorisation)</li>
+            <li>Champ texte — entrez le nom du lieu manuellement</li>
+        </ul>
+        Vous pouvez aussi <strong>cliquer/toucher la carte</strong> pour placer un marqueur manuellement.
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">3</div>
+    <div class="step-content">
+        <strong>S&eacute;lection des esp&egrave;ces</strong><br>
+        Choisissez les esp&egrave;ces que vous pourriez observer durant cette session :
+        <ul style="margin-top:6px;">
+            <li><strong>Tout s&eacute;lectionner</strong> — ajoute toutes les esp&egrave;ces d'un coup</li>
+            <li><strong>Basculer</strong> — s&eacute;lectionne/d&eacute;s&eacute;lectionne une cat&eacute;gorie enti&egrave;re</li>
+            <li><strong>Cliquer sur une fiche</strong> — ajoute ou retire une esp&egrave;ce individuelle</li>
+            <li><strong>Recherche</strong> — filtrez par nom pour trouver rapidement une esp&egrave;ce</li>
+        </ul>
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">4</div>
+    <div class="step-content">
+        <strong>D&eacute;marrer la session</strong><br>
+        Appuyez sur le gros bouton dor&eacute; <strong>"D&eacute;marrer la session"</strong>. Le panneau bascule imm&eacute;diatement en mode observation. Les viewers qui ont l'extension voient la session appara&icirc;tre en temps r&eacute;el.
+    </div>
+</div>
+
+<div class="info-box warning">
+    <div class="box-title">Important</div>
+    Il ne peut y avoir qu'<strong>une seule session active</strong> &agrave; la fois. Si vous d&eacute;marrez une nouvelle session, assurez-vous que la pr&eacute;c&eacute;dente est bien termin&eacute;e.
+</div>
+
+<!-- ============================== -->
+<div class="page-break"></div>
+<h2>4. Pendant le stream — Observer</h2>
+
+<p>Une fois la session d&eacute;marr&eacute;e, vous voyez l'interface d'observation avec trois onglets.</p>
+
+<h3>Onglet "Observer"</h3>
+<p>C'est l'onglet principal. Vous voyez la grille de toutes les esp&egrave;ces s&eacute;lectionn&eacute;es pour cette session.</p>
+
+<div class="step">
+    <div class="step-number">A</div>
+    <div class="step-content">
+        <strong>Signaler une observation</strong><br>
+        D&egrave;s que vous observez un animal, appuyez sur le bouton vert <strong>"VU !"</strong> sous la fiche correspondante.
+        <ul style="margin-top:6px;">
+            <li>La fiche passe en surbrillance dor&eacute;e avec l'heure d'observation</li>
+            <li>Le compteur en haut se met &agrave; jour (ex : "3/12")</li>
+            <li>Les viewers re&ccedil;oivent <strong>une alerte anim&eacute;e</strong> en temps r&eacute;el</li>
+            <li>Vous pouvez observer la m&ecirc;me esp&egrave;ce plusieurs fois (bouton "Revoir")</li>
+        </ul>
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">B</div>
+    <div class="step-content">
+        <strong>Voir le d&eacute;tail d'une esp&egrave;ce</strong><br>
+        Touchez la photo ou le nom d'une fiche pour ouvrir sa fiche d&eacute;taill&eacute;e (habitat, taille, r&eacute;gime, lien Wikipedia...).
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">C</div>
+    <div class="step-content">
+        <strong>Rechercher</strong><br>
+        La barre de recherche en haut filtre les esp&egrave;ces en temps r&eacute;el. Pratique pour trouver rapidement un animal dans une longue liste.
+    </div>
+</div>
+
+<div class="info-box tip">
+    <div class="box-title">Conseil terrain</div>
+    Le <strong>journal</strong> en bas de l'onglet Observer affiche la liste chronologique de toutes vos observations de la session. Utile pour ne pas oublier ce que vous avez d&eacute;j&agrave; signal&eacute;.
+</div>
+
+<h3>Onglet "Carte"</h3>
+<p>Affiche la carte avec votre position d'observation. M&ecirc;me carte que celle vue par les spectateurs.</p>
+
+<h3>Onglet "Historique"</h3>
+<p>Affiche <strong>toutes vos observations</strong>, toutes sessions confondues. Vous y trouverez :</p>
+<ul>
+    <li>Le nombre total d'esp&egrave;ces diff&eacute;rentes observ&eacute;es</li>
+    <li>Le nombre total d'observations</li>
+    <li>La liste class&eacute;e par fr&eacute;quence d'observation</li>
+</ul>
+
+<!-- ============================== -->
+<div class="page-break"></div>
+<h2>5. Ce que les viewers voient</h2>
+
+<p>Les spectateurs voient un panneau compact sous le stream avec trois onglets :</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <span class="feat-icon">📖</span>
+        <div class="feat-title">Guide</div>
+        <div class="feat-desc">Grille des esp&egrave;ces : les non-observ&eacute;es sont en gris, les observ&eacute;es en couleur avec l'heure. Cliquer ouvre la fiche d&eacute;taill&eacute;e.</div>
+    </div>
+    <div class="feature-card">
+        <span class="feat-icon">🗺️</span>
+        <div class="feat-title">Carte</div>
+        <div class="feat-desc">Carte OpenStreetMap avec la zone d'observation.</div>
+    </div>
+    <div class="feature-card">
+        <span class="feat-icon">📊</span>
+        <div class="feat-title">Stats</div>
+        <div class="feat-desc">Compteur d'esp&egrave;ces, nombre d'observations, dur&eacute;e de session, derni&egrave;res observations.</div>
+    </div>
+    <div class="feature-card" style="grid-column: span 2;">
+        <span class="feat-icon">🚨</span>
+        <div class="feat-title">Alerte d'observation</div>
+        <div class="feat-desc">Quand vous signalez une observation, une alerte <strong>plein &eacute;cran</strong> prend tout le panneau pendant 5 secondes avec la photo en grand et le nom de l'animal. La fiche de l'animal s'illumine &eacute;galement.</div>
+    </div>
+</div>
+
+<p>Quand <strong>aucune session n'est active</strong>, les viewers voient simplement un message "Aucune session d'observation en cours".</p>
+
+<!-- ============================== -->
+<h2>6. Apr&egrave;s le stream</h2>
+
+<div class="step">
+    <div class="step-number">1</div>
+    <div class="step-content">
+        <strong>Terminer la session</strong><br>
+        Appuyez sur le bouton rouge <strong>"Terminer"</strong> en haut &agrave; droite du panneau admin. Une confirmation vous sera demand&eacute;e. La session passe en inactif et le panneau viewer affiche "Aucune session en cours".
+    </div>
+</div>
+
+<div class="step">
+    <div class="step-number">2</div>
+    <div class="step-content">
+        <strong>Les donn&eacute;es sont conserv&eacute;es</strong><br>
+        Toutes les observations sont enregistr&eacute;es dans la base de donn&eacute;es. Elles apparaissent dans l'onglet Historique et seront disponibles pour les prochaines sessions.
+    </div>
+</div>
+
+<div class="info-box info">
+    <div class="box-title">Bon &agrave; savoir</div>
+    Vous pouvez fermer le navigateur sans probl&egrave;me. La session reste active tant que vous ne cliquez pas sur "Terminer". Si vous rouvrez le panneau admin, il retrouvera automatiquement la session en cours.
+</div>
+
+<!-- ============================== -->
+<div class="page-break"></div>
+<h2>7. Acc&egrave;s &amp; liens utiles</h2>
+
+<h3>Panneau Admin</h3>
+<div class="url-box"><a href="https://renoobe.github.io/onlyfaune/admin.html" target="_blank" rel="noopener" style="color:#d4a842;">https://renoobe.github.io/onlyfaune/admin.html</a></div>
+
+<h3>Panneau Viewer (pour tester hors Twitch)</h3>
+<div class="url-box"><a href="https://renoobe.github.io/onlyfaune/panel.html" target="_blank" rel="noopener" style="color:#d4a842;">https://renoobe.github.io/onlyfaune/panel.html</a></div>
+
+<h3>Tester sans &ecirc;tre en stream</h3>
+<p>Vous pouvez tester l'ensemble du syst&egrave;me sans &ecirc;tre en live :</p>
+<ol>
+    <li>Ouvrez <strong>admin.html</strong> sur un appareil (ou onglet)</li>
+    <li>Ouvrez <strong>panel.html</strong> sur un autre appareil (ou onglet)</li>
+    <li>Cr&eacute;ez une session dans l'admin</li>
+    <li>Observez : le panneau viewer se met &agrave; jour en temps r&eacute;el</li>
+</ol>
+
+<div class="info-box tip">
+    <div class="box-title">R&eacute;sum&eacute; des actions essentielles</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:0.9rem;">
+        <tr style="border-bottom:1px solid #c8e6c9;">
+            <td style="padding:6px 0;font-weight:600;">D&eacute;marrer un stream</td>
+            <td style="padding:6px 0;">Ouvrir admin &rarr; Remplir titre + lieu &rarr; S&eacute;lectionner esp&egrave;ces &rarr; D&eacute;marrer</td>
+        </tr>
+        <tr style="border-bottom:1px solid #c8e6c9;">
+            <td style="padding:6px 0;font-weight:600;">Signaler une observation</td>
+            <td style="padding:6px 0;">Bouton vert "VU !" sur la fiche de l'animal</td>
+        </tr>
+        <tr style="border-bottom:1px solid #c8e6c9;">
+            <td style="padding:6px 0;font-weight:600;">Voir les d&eacute;tails</td>
+            <td style="padding:6px 0;">Toucher la photo ou le nom de l'animal</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 0;font-weight:600;">Terminer le stream</td>
+            <td style="padding:6px 0;">Bouton rouge "Terminer" en haut &agrave; droite</td>
+        </tr>
+    </table>
+</div>
+
+<div class="footer-doc">
+    <p>OnlyFaune — Extension Twitch d'observation de la faune sauvage</p>
+    <p>Donn&eacute;es : Wikip&eacute;dia (CC BY-SA) · Photos : Wikimedia Commons · Cartographie : OpenStreetMap</p>
+</div>
+
+</body>
+</html>

@@ -86,30 +86,44 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* ── Alert banner ── */
+        /* ── Alert fullscreen ── */
         .alert {
             position: fixed;
-            top: 0; left: 0; right: 0;
-            background: linear-gradient(135deg, var(--green) 0%, #1a4a3a 100%);
-            border-bottom: 2px solid var(--gold);
-            padding: 10px 12px;
+            inset: 0;
+            background: linear-gradient(135deg, #1a3a2a 0%, #0a1a0a 100%);
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
             z-index: 100;
-            transform: translateY(-100%);
-            transition: transform .4s ease;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .4s ease;
+            text-align: center;
+            padding: 24px 16px;
         }
-        .alert.show { transform: translateY(0); }
+        .alert.show { opacity: 1; pointer-events: auto; }
         .alert .alert-thumb {
-            width: 44px; height: 44px;
-            border-radius: 6px;
+            width: 120px; height: 120px;
+            border-radius: 12px;
             object-fit: cover;
-            border: 2px solid var(--gold);
+            border: 3px solid var(--gold);
+            margin-bottom: 16px;
+            box-shadow: 0 0 40px rgba(212,168,66,.3);
         }
-        .alert .alert-text { flex: 1; }
-        .alert .alert-label { font-size: .7rem; color: var(--gold-bright); text-transform: uppercase; font-weight: 700; letter-spacing: .05em; }
-        .alert .alert-name { font-size: .95rem; font-weight: 700; }
+        .alert .alert-text { }
+        .alert .alert-label {
+            font-size: .85rem;
+            color: var(--gold-bright);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: .1em;
+            margin-bottom: 6px;
+            animation: alertPulse 1s infinite;
+        }
+        @keyframes alertPulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+        .alert .alert-name { font-size: 1.4rem; font-weight: 800; color: #fff; }
+        .alert .alert-latin { font-size: .85rem; color: var(--text-dim); font-style: italic; margin-top: 4px; }
 
         /* ── Species list ── */
         .species-section { padding: 0 8px; }
@@ -297,7 +311,7 @@
 
         <div id="tab-stats" class="tab-content">
             <div class="stats">
-                <div class="stat-row"><span class="stat-label">Espèces observées</span><span class="stat-value" id="st-session">0/0</span></div>
+                <div class="stat-row"><span class="stat-label">Espèces vues</span><span class="stat-value" id="st-session">0/0</span></div>
                 <div class="stat-row"><span class="stat-label">Total observations</span><span class="stat-value" id="st-total">0</span></div>
                 <div class="stat-row"><span class="stat-label">Durée</span><span class="stat-value" id="st-duration">—</span></div>
                 <div class="recent-obs">
@@ -308,12 +322,13 @@
         </div>
     </div>
 
-    <!-- Alert banner -->
+    <!-- Alert fullscreen -->
     <div class="alert" id="alert">
         <img class="alert-thumb" id="alert-thumb" src="" alt="">
         <div class="alert-text">
-            <div class="alert-label">Observation !</div>
+            <div class="alert-label">VU !</div>
             <div class="alert-name" id="alert-name"></div>
+            <div class="alert-latin" id="alert-latin"></div>
         </div>
     </div>
 
@@ -483,6 +498,7 @@
             if (url) { thumb.src = url; thumb.style.display = 'block'; }
             else thumb.style.display = 'none';
             $('#alert-name').textContent = sp.name_fr;
+            $('#alert-latin').textContent = sp.name_latin;
             el.classList.add('show');
             setTimeout(() => el.classList.remove('show'), 5000);
 
