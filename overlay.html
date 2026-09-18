@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune Overlay</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: rgba(14,14,16,.88);
+            --bg-card: rgba(24,24,27,.92);
+            --bg-elevated: rgba(31,31,35,.95);
+            --border: rgba(45,45,53,.7);
+            --text: #efeff1;
+            --text-dim: #adadb8;
+            --gold: #d4a842;
+            --gold-bright: #f0c850;
+            --green: #2d6a4f;
+            --green-bright: #40916c;
+            --radius: 8px;
+        }
+
+        html, body {
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* ── Toggle button ── */
+        .toggle-btn {
+            position: fixed;
+            bottom: 60px;
+            right: 12px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(14,14,16,.85);
+            border: 2px solid var(--gold);
+            color: var(--gold);
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: all .2s;
+            box-shadow: 0 4px 20px rgba(0,0,0,.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .toggle-btn:hover { background: rgba(212,168,66,.2); transform: scale(1.08); }
+        .toggle-btn.active { background: var(--gold); color: #000; }
+
+        .toggle-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #e91916;
+            color: #fff;
+            font-size: .6rem;
+            font-weight: 700;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            display: none;
+        }
+        .toggle-badge.show { display: flex; }
+
+        /* ── Panel sliding from right ── */
+        .panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100%;
+            background: var(--bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-left: 1px solid var(--border);
+            transform: translateX(100%);
+            transition: transform .35s cubic-bezier(.4,0,.2,1);
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel.open { transform: translateX(0); }
+
+        .panel-header {
+            background: rgba(26,42,26,.95);
+            padding: 10px 12px;
+            border-bottom: 2px solid var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .panel-header .logo { font-size: 1rem; font-weight: 800; color: var(--gold); }
+        .panel-header .session-name {
+            font-size: .72rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+        .panel-header .live-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #e91916;
+            animation: blink 1.5s infinite;
+            flex-shrink: 0;
+        }
+        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+        .panel-header .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+        .panel-header .close-btn:hover { color: var(--text); }
+
+        .no-session {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--text-dim);
+            flex: 1;
+        }
+        .no-session .icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+        .tabs {
+            display: flex;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .tab {
+            flex: 1;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            cursor: pointer;
+            border: none;
+            background: none;
+            border-bottom: 2px solid transparent;
+            transition: all .15s;
+        }
+        .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+        .tab-content { display: none; flex: 1; overflow-y: auto; }
+        .tab-content.active { display: block; }
+
+        /* ── Species list ── */
+        .species-section { padding: 0 8px; }
+        .cat-title {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--gold);
+            padding: 8px 4px 4px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cat-title .cat-count { font-size: .65rem; color: var(--text-dim); font-weight: 400; }
+
+        .s-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-bottom: 6px; }
+
+        .s-card {
+            background: var(--bg-card);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .s-card.observed { border-color: var(--gold); }
+        .s-card.just-seen { animation: goldFlash .8s ease; }
+
+        @keyframes goldFlash {
+            0% { box-shadow: 0 0 0 rgba(212,168,66,0); }
+            40% { box-shadow: 0 0 20px rgba(212,168,66,.6); }
+            100% { box-shadow: 0 0 0 rgba(212,168,66,0); }
+        }
+
+        .s-card .s-thumb {
+            width: 100%;
+            height: 60px;
+            object-fit: cover;
+            display: block;
+            background: var(--bg-elevated);
+        }
+        .s-card .s-thumb-ph {
+            width: 100%; height: 60px;
+            background: var(--bg-elevated);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+        .s-card .s-info { padding: 4px 6px 5px; }
+        .s-card .s-name {
+            font-size: .72rem;
+            font-weight: 600;
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .s-card .s-latin {
+            font-size: .6rem;
+            color: var(--text-dim);
+            font-style: italic;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .s-card .s-obs-tag {
+            font-size: .58rem;
+            background: var(--gold);
+            color: #000;
+            padding: 0 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            display: inline-block;
+            margin-top: 2px;
+        }
+
+        .s-card.not-observed .s-thumb, .s-card.not-observed .s-thumb-ph { filter: grayscale(.6) brightness(.7); }
+
+        /* ── Detail overlay ── */
+        .detail-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--bg);
+            z-index: 50;
+            overflow-y: auto;
+            display: none;
+        }
+        .detail-overlay.open { display: block; }
+        .detail-back {
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            font-size: .85rem;
+            color: var(--gold);
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            width: 100%;
+            text-align: left;
+        }
+        .detail-img { width: 100%; max-height: 160px; object-fit: cover; }
+        .detail-body { padding: 12px; }
+        .detail-body h2 { color: var(--gold); font-size: 1rem; margin-bottom: 2px; }
+        .detail-body .latin { color: var(--text-dim); font-style: italic; font-size: .8rem; margin-bottom: 10px; }
+        .detail-body .desc { font-size: .82rem; margin-bottom: 12px; line-height: 1.5; }
+        .detail-body .field { margin-bottom: 5px; font-size: .8rem; }
+        .detail-body .field strong { color: var(--gold); }
+        .detail-body .credit { font-size: .68rem; color: var(--text-dim); margin-top: 10px; }
+        .detail-body a { color: var(--gold); }
+
+        /* ── Map tab ── */
+        #panel-map { height: 100%; width: 100%; min-height: 300px; }
+
+        /* ── Stats tab ── */
+        .stats { padding: 12px; }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            margin-bottom: 6px;
+            border: 1px solid var(--border);
+        }
+        .stat-label { font-size: .82rem; color: var(--text-dim); }
+        .stat-value { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+
+        .recent-obs { margin-top: 14px; }
+        .recent-obs h3 { font-size: .82rem; color: var(--gold); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .03em; }
+        .recent-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: .82rem;
+        }
+        .recent-item:last-child { border: none; }
+        .recent-item .r-time { color: var(--text-dim); min-width: 38px; font-variant-numeric: tabular-nums; }
+        .recent-item .r-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+
+        /* ── Alert fullscreen ── */
+        .alert {
+            position: fixed;
+            inset: 0;
+            background: rgba(10,26,10,.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .4s ease;
+            text-align: center;
+            padding: 24px 16px;
+        }
+        .alert.show { opacity: 1; pointer-events: auto; }
+        .alert .alert-thumb {
+            width: 140px; height: 140px;
+            border-radius: 14px;
+            object-fit: cover;
+            border: 3px solid var(--gold);
+            margin-bottom: 16px;
+            box-shadow: 0 0 60px rgba(212,168,66,.35);
+        }
+        .alert .alert-label {
+            font-size: 1rem;
+            color: var(--gold-bright);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: .12em;
+            margin-bottom: 6px;
+            animation: alertPulse 1s infinite;
+        }
+        @keyframes alertPulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+        .alert .alert-name { font-size: 1.6rem; font-weight: 800; color: #fff; }
+        .alert .alert-latin { font-size: .9rem; color: var(--text-dim); font-style: italic; margin-top: 4px; }
+
+        .footer {
+            text-align: center;
+            padding: 8px;
+            font-size: .6rem;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .footer a { color: var(--gold); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<!-- Toggle button -->
+<button class="toggle-btn" id="toggle-btn" title="OnlyFaune">
+    🦉
+    <span class="toggle-badge" id="toggle-badge"></span>
+</button>
+
+<!-- Sliding panel -->
+<div class="panel" id="panel">
+    <div class="panel-header">
+        <span class="logo">OnlyFaune</span>
+        <span class="session-name" id="p-session-name">—</span>
+        <span class="live-dot" id="p-live-dot" style="display:none;"></span>
+        <button class="close-btn" id="close-btn">&times;</button>
+    </div>
+
+    <div id="no-session" class="no-session">
+        <div class="icon">🦉</div>
+        <p>Aucune session en cours.</p>
+        <p style="font-size:.75rem;margin-top:6px;">Revenez quand le stream commence !</p>
+    </div>
+
+    <div id="panel-main" style="display:none;flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div class="tabs">
+            <button class="tab active" data-tab="guide">Guide</button>
+            <button class="tab" data-tab="carte">Carte</button>
+            <button class="tab" data-tab="stats">Stats</button>
+        </div>
+
+        <div id="tab-guide" class="tab-content active">
+            <div id="species-container" class="species-section"></div>
+        </div>
+
+        <div id="tab-carte" class="tab-content">
+            <div id="panel-map"></div>
+        </div>
+
+        <div id="tab-stats" class="tab-content">
+            <div class="stats">
+                <div class="stat-row"><span class="stat-label">Espèces vues</span><span class="stat-value" id="st-session">0/0</span></div>
+                <div class="stat-row"><span class="stat-label">Total observations</span><span class="stat-value" id="st-total">0</span></div>
+                <div class="stat-row"><span class="stat-label">Durée</span><span class="stat-value" id="st-duration">—</span></div>
+                <div class="recent-obs">
+                    <h3>Dernières observations</h3>
+                    <div id="recent-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Données : <a href="https://fr.wikipedia.org" target="_blank" rel="noopener">Wikipédia</a> · Photos : Wikimedia Commons
+        </div>
+    </div>
+
+    <!-- Detail overlay (inside panel) -->
+    <div class="detail-overlay" id="detail">
+        <button class="detail-back" id="detail-back">← Retour</button>
+        <div id="detail-content"></div>
+    </div>
+</div>
+
+<!-- Alert fullscreen -->
+<div class="alert" id="alert">
+    <img class="alert-thumb" id="alert-thumb" src="" alt="">
+    <div class="alert-text">
+        <div class="alert-label">VU !</div>
+        <div class="alert-name" id="alert-name"></div>
+        <div class="alert-latin" id="alert-latin"></div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const $ = s => document.querySelector(s);
+
+    let session = null;
+    let allSpecies = [];
+    let sessionIds = new Set();
+    let obs = [];
+    let thumbs = {};
+    let panelMap = null;
+    let timerRef = null;
+    let panelOpen = false;
+
+    // ── Toggle panel ──
+    function togglePanel(forceOpen) {
+        const panel = $('#panel');
+        const btn = $('#toggle-btn');
+        panelOpen = forceOpen !== undefined ? forceOpen : !panelOpen;
+        panel.classList.toggle('open', panelOpen);
+        btn.classList.toggle('active', panelOpen);
+        $('#toggle-badge').classList.remove('show');
+    }
+
+    $('#toggle-btn').onclick = () => togglePanel();
+    $('#close-btn').onclick = () => togglePanel(false);
+
+    async function init() {
+        allSpecies = await loadSpecies();
+        await fetchThumbs();
+        session = await getActive();
+        if (session) {
+            sessionIds = await loadSessionSpecies(session.id);
+            obs = await loadObs(session.id);
+            showPanel();
+        }
+        setupRealtime();
+        setupEvents();
+    }
+
+    async function loadSpecies() {
+        const { data } = await supabase.from('species').select('*').order('subcategory').order('name_fr');
+        return data || [];
+    }
+
+    async function getActive() {
+        const { data } = await supabase.from('observation_sessions').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        return data;
+    }
+
+    async function loadSessionSpecies(sid) {
+        const { data } = await supabase.from('session_species').select('species_id').eq('session_id', sid);
+        return new Set((data || []).map(d => d.species_id));
+    }
+
+    async function loadObs(sid) {
+        const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin, category)').eq('session_id', sid).order('observed_at', { ascending: false });
+        return data || [];
+    }
+
+    async function fetchThumbs() {
+        const entries = allSpecies.filter(s => s.source_url).map(s => {
+            const m = s.source_url.match(/\/wiki\/(.+)$/);
+            return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
+        }).filter(Boolean);
+
+        for (let i = 0; i < entries.length; i += 50) {
+            const batch = entries.slice(i, i + 50);
+            try {
+                const titles = batch.map(e => e.title).join('|');
+                const resp = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=pageimages&format=json&pithumbsize=250&origin=*`);
+                const json = await resp.json();
+                if (!json.query?.pages) continue;
+                const byTitle = {};
+                for (const p of Object.values(json.query.pages)) {
+                    if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
+                }
+                for (const e of batch) {
+                    const key = e.title.replace(/_/g, ' ');
+                    if (byTitle[key]) thumbs[e.id] = byTitle[key];
+                }
+            } catch {}
+        }
+    }
+
+    function getThumb(sp) { return thumbs[sp.id] || sp.photo_url || null; }
+
+    function showPanel() {
+        $('#no-session').style.display = 'none';
+        const main = $('#panel-main');
+        main.style.display = 'flex';
+        $('#p-session-name').textContent = session.title;
+        $('#p-live-dot').style.display = 'block';
+        renderGuide();
+        renderStats();
+        startTimer();
+    }
+
+    function renderGuide() {
+        const container = $('#species-container');
+        const inSession = allSpecies.filter(s => sessionIds.has(s.id));
+        const obsIds = new Set(obs.map(o => o.species_id));
+
+        const grouped = {};
+        for (const sp of inSession) {
+            const k = sp.subcategory || 'Autre';
+            if (!grouped[k]) grouped[k] = [];
+            grouped[k].push(sp);
+        }
+
+        let html = '';
+        for (const [cat, sps] of Object.entries(grouped)) {
+            const seen = sps.filter(s => obsIds.has(s.id)).length;
+            html += `<div class="cat-title">${cat} <span class="cat-count">${seen}/${sps.length}</span></div><div class="s-grid">`;
+            for (const sp of sps) {
+                const isObs = obsIds.has(sp.id);
+                const url = getThumb(sp);
+                const imgHtml = url
+                    ? `<img class="s-thumb" src="${url}" alt="${sp.name_fr}" loading="lazy">`
+                    : `<div class="s-thumb-ph">${sp.category === 'bird' ? '🐦' : '🦊'}</div>`;
+                const last = obs.find(o => o.species_id === sp.id);
+                const t = last ? new Date(last.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+
+                html += `<div class="s-card ${isObs ? 'observed' : 'not-observed'}" data-id="${sp.id}">${imgHtml}<div class="s-info"><div class="s-name">${sp.name_fr}</div><div class="s-latin">${sp.name_latin}</div>${isObs ? `<span class="s-obs-tag">✓ ${t}</span>` : ''}</div></div>`;
+            }
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function renderStats() {
+        const obsIds = new Set(obs.map(o => o.species_id));
+        const total = allSpecies.filter(s => sessionIds.has(s.id)).length;
+        $('#st-session').textContent = `${obsIds.size}/${total}`;
+        $('#st-total').textContent = obs.length;
+
+        const list = $('#recent-list');
+        if (!obs.length) { list.innerHTML = '<p style="color:var(--text-dim);font-size:.82rem;">Aucune observation</p>'; return; }
+        list.innerHTML = obs.slice(0, 10).map(o => {
+            const t = new Date(o.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+            return `<div class="recent-item"><span class="r-time">${t}</span><span class="r-dot"></span><span>${o.species?.name_fr || '?'}</span></div>`;
+        }).join('');
+    }
+
+    function startTimer() {
+        if (!session) return;
+        const start = new Date(session.started_at).getTime();
+        const update = () => {
+            const d = Date.now() - start;
+            const h = Math.floor(d / 3600000);
+            const m = Math.floor((d % 3600000) / 60000);
+            $('#st-duration').textContent = `${h}h${String(m).padStart(2, '0')}`;
+        };
+        update();
+        timerRef = setInterval(update, 30000);
+    }
+
+    function showAlert(sp) {
+        const el = $('#alert');
+        const url = getThumb(sp);
+        const thumb = $('#alert-thumb');
+        if (url) { thumb.src = url; thumb.style.display = 'block'; }
+        else thumb.style.display = 'none';
+        $('#alert-name').textContent = sp.name_fr;
+        $('#alert-latin').textContent = sp.name_latin;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 5000);
+
+        // Flash the badge if panel is closed
+        if (!panelOpen) {
+            const badge = $('#toggle-badge');
+            badge.textContent = '!';
+            badge.classList.add('show');
+        }
+
+        const card = document.querySelector(`.s-card[data-id="${sp.id}"]`);
+        if (card) { card.classList.add('just-seen'); setTimeout(() => card.classList.remove('just-seen'), 2000); }
+    }
+
+    function showDetail(id) {
+        const sp = allSpecies.find(s => s.id === id);
+        if (!sp) return;
+        const url = getThumb(sp);
+        const fields = [
+            ['Habitat', sp.habitat],
+            ['Taille', sp.size],
+            ['Poids', sp.weight],
+            ['Régime', sp.diet],
+            ['Comportement', sp.behavior],
+            ['Statut', sp.conservation_status],
+        ].filter(([, v]) => v);
+
+        const imgHtml = url ? `<img class="detail-img" src="${url}" alt="${sp.name_fr}">` : '';
+
+        $('#detail-content').innerHTML = `
+            ${imgHtml}
+            <div class="detail-body">
+                <h2>${sp.name_fr}</h2>
+                <p class="latin">${sp.name_latin}</p>
+                ${sp.description ? `<p class="desc">${sp.description}</p>` : ''}
+                ${fields.map(([l, v]) => `<p class="field"><strong>${l} :</strong> ${v}</p>`).join('')}
+                ${sp.source_url ? `<p style="margin-top:8px;"><a href="${sp.source_url}" target="_blank" rel="noopener" style="font-size:.8rem;">Wikipédia →</a></p>` : ''}
+                <p class="credit">Photo : ${sp.photo_credit || 'Wikimedia Commons'}</p>
+            </div>
+        `;
+        $('#detail').classList.add('open');
+    }
+
+    function setupRealtime() {
+        supabase.channel('overlay-obs').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'observations' }, async payload => {
+            if (!session || payload.new.session_id !== session.id) return;
+            if (obs.find(o => o.id === payload.new.id)) return;
+
+            const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin, category)').eq('id', payload.new.id).single();
+            if (!data) return;
+            obs.unshift(data);
+            renderGuide();
+            renderStats();
+
+            const sp = allSpecies.find(s => s.id === data.species_id);
+            if (sp) showAlert(sp);
+        }).subscribe();
+
+        supabase.channel('overlay-session').on('postgres_changes', { event: '*', schema: 'public', table: 'observation_sessions' }, async () => {
+            const newSession = await getActive();
+            if (newSession && (!session || newSession.id !== session.id)) {
+                session = newSession;
+                sessionIds = await loadSessionSpecies(session.id);
+                obs = await loadObs(session.id);
+                showPanel();
+            } else if (!newSession && session) {
+                session = null;
+                sessionIds.clear();
+                obs = [];
+                clearInterval(timerRef);
+                $('#no-session').style.display = 'block';
+                $('#panel-main').style.display = 'none';
+                $('#p-live-dot').style.display = 'none';
+            }
+        }).subscribe();
+    }
+
+    function setupEvents() {
+        document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const name = tab.dataset.tab;
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            const target = $(`#tab-${name === 'carte' ? 'carte' : name === 'stats' ? 'stats' : 'guide'}`);
+            if (target) target.classList.add('active');
+            if (name === 'carte') setTimeout(initMap, 50);
+        });
+
+        document.addEventListener('click', e => {
+            const card = e.target.closest('.s-card');
+            if (card?.dataset.id) { showDetail(card.dataset.id); return; }
+        });
+
+        $('#detail-back').onclick = () => $('#detail').classList.remove('open');
+    }
+
+    function initMap() {
+        if (panelMap) { panelMap.remove(); panelMap = null; }
+        const lat = session?.latitude || 46.5;
+        const lng = session?.longitude || 2.5;
+        const zoom = session?.latitude ? 13 : 6;
+        panelMap = L.map('panel-map').setView([lat, lng], zoom);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(panelMap);
+        if (session?.latitude) L.marker([lat, lng]).addTo(panelMap).bindPopup(session.location_name || '📍').openPopup();
+        setTimeout(() => panelMap.invalidateSize(), 200);
+    }
+
+    init();
+</script>
+</body>
+</html>
