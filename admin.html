@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OnlyFaune - Admin</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦉</text></svg>">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -337,7 +337,11 @@
 
             <div class="form-group">
                 <label>Localisation</label>
-                <input type="text" id="inp-location" placeholder="Ex : Parc régional du Poitou" style="margin-bottom:8px;">
+                <input type="text" id="inp-location" placeholder="Nom affiché aux viewers (texte libre) – Ex : Marais de Fontenelle" style="margin-bottom:8px;">
+                <div style="position:relative;margin-bottom:8px;">
+                    <input type="text" id="inp-geosearch" placeholder="🔍 Chercher un lieu sur la carte (Entrée)…" autocomplete="off">
+                    <div id="geo-results" class="hidden" style="position:absolute;left:0;right:0;top:100%;z-index:1000;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;"></div>
+                </div>
                 <div class="map-wrap"><div id="map"></div></div>
             </div>
 
@@ -348,6 +352,18 @@
                     <button class="btn btn-small btn-secondary" data-act="select-all">Tout sélectionner</button>
                     <button class="btn btn-small btn-secondary" data-act="deselect-all">Tout désélectionner</button>
                 </div>
+                <details id="add-species" style="margin:10px 0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px;">
+                    <summary style="cursor:pointer;font-weight:600;">➕ Ajouter une espèce absente de la liste</summary>
+                    <div style="display:grid;gap:8px;margin-top:10px;">
+                        <input type="text" id="sp-name-fr" placeholder="Nom français * (ex : Sarcelle d'hiver)">
+                        <input type="text" id="sp-name-latin" placeholder="Nom latin * (ex : Anas crecca)">
+                        <select id="sp-category"><option value="bird">Oiseau</option><option value="mammal">Mammifère</option></select>
+                        <input type="text" id="sp-subcategory" list="sp-subcats" placeholder="Groupe (ex : Oiseaux d'eau)">
+                        <datalist id="sp-subcats"></datalist>
+                        <input type="text" id="sp-wiki" placeholder="Lien Wikipédia FR (optionnel, pour la photo)">
+                        <button type="button" id="btn-add-species" class="btn btn-primary">Ajouter et sélectionner</button>
+                    </div>
+                </details>
                 <div id="species-select"></div>
             </div>
 
@@ -405,7 +421,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -747,6 +763,10 @@
             $('#btn-start').onclick = startSession;
             $('#btn-end').onclick = endSession;
             $('#btn-update-loc').onclick = updateLocation;
+            $('#btn-add-species').onclick = addSpecies;
+            $('#inp-geosearch').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); geoSearch(); } };
+            document.addEventListener('click', e => { if (!e.target.closest('#geo-results') && e.target.id !== 'inp-geosearch') $('#geo-results').classList.add('hidden'); });
+            fillSubcats();
             $('#modal-close').onclick = () => $('#modal').classList.add('hidden');
             $('#modal').onclick = e => { if (e.target === $('#modal')) $('#modal').classList.add('hidden'); };
 
@@ -848,6 +868,65 @@
             el.textContent = msg;
             el.classList.add('show');
             setTimeout(() => el.classList.remove('show'), 2500);
+        }
+
+        // ── Recherche de lieu (Nominatim) : aide au placement du pin, le nom affiché reste libre ──
+        async function geoSearch() {
+            const q = $('#inp-geosearch').value.trim();
+            const box = $('#geo-results');
+            if (q.length < 3) { box.classList.add('hidden'); return; }
+            try {
+                const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=fr&q=' + encodeURIComponent(q));
+                const res = await r.json();
+                box.innerHTML = '';
+                if (!res.length) box.textContent = 'Aucun résultat';
+                for (const p of res) {
+                    const row = document.createElement('div');
+                    row.textContent = p.display_name;
+                    row.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--border);';
+                    row.onclick = () => {
+                        const latlng = L.latLng(parseFloat(p.lat), parseFloat(p.lon));
+                        loc = latlng;
+                        if (marker) marker.remove();
+                        if (!map) initMap();
+                        marker = L.marker(latlng).addTo(map);
+                        map.setView(latlng, 13);
+                        if (!$('#inp-location').value.trim()) $('#inp-location').value = p.display_name.split(',').slice(0, 2).join(',').trim();
+                        box.classList.add('hidden');
+                    };
+                    box.appendChild(row);
+                }
+                box.classList.remove('hidden');
+            } catch { toast('Recherche indisponible'); }
+        }
+
+        // ── Ajout d'une espèce personnalisée ──
+        async function addSpecies() {
+            const name_fr = $('#sp-name-fr').value.trim();
+            const name_latin = $('#sp-name-latin').value.trim();
+            if (!name_fr || !name_latin) { toast('Nom français et latin requis'); return; }
+            const wiki = $('#sp-wiki').value.trim();
+            const row = {
+                name_fr, name_latin,
+                category: $('#sp-category').value,
+                subcategory: $('#sp-subcategory').value.trim() || 'Autre',
+                source_url: /^https?:\/\/fr\.wikipedia\.org\/wiki\//.test(wiki) ? wiki : null,
+                photo_credit: 'Wikimedia Commons',
+            };
+            const { data, error } = await supabase.from('species').insert(row).select().single();
+            if (error) { toast('Erreur : ' + error.message); return; }
+            allSpecies.push(data);
+            allSpecies.sort((a, b) => (a.subcategory || '').localeCompare(b.subcategory || '') || a.name_fr.localeCompare(b.name_fr));
+            selected.add(data.id);
+            await fetchThumbs();
+            ['sp-name-fr', 'sp-name-latin', 'sp-wiki'].forEach(i => $('#' + i).value = '');
+            fillSubcats();
+            renderSelection($('#search-new').value.toLowerCase());
+            toast(`${name_fr} ajoutée !`);
+        }
+
+        function fillSubcats() {
+            $('#sp-subcats').innerHTML = [...new Set(allSpecies.map(s => s.subcategory).filter(Boolean))].map(c => `<option value="${c}">`).join('');
         }
 
         // ── Start ──

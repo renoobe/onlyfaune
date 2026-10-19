@@ -351,7 +351,7 @@
         .detail-body a:hover { text-decoration: underline; }
 
         /* ── Map tab ── */
-        #panel-map { height: 100%; width: 100%; min-height: 300px; }
+        #panel-map { height: 300px; width: 100%; }
 
         /* ── Stats tab ── */
         .stats { padding: 12px; }
@@ -444,6 +444,7 @@
         .detail-overlay::-webkit-scrollbar-track { background: transparent; }
         .detail-overlay::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
     </style>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 </head>
 <body>
 
@@ -485,6 +486,9 @@
 
         <div id="tab-carte" class="tab-content">
             <div id="panel-map"></div>
+            <div style="padding:8px 12px;">
+                <p style="font-size:.82rem;"><strong style="color:var(--gold);">Zone :</strong> <span id="p-location-name">—</span></p>
+            </div>
         </div>
 
         <div id="tab-stats" class="tab-content">
@@ -520,285 +524,9 @@
         <div class="alert-latin" id="alert-latin"></div>
     </div>
 </div>
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-    const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    const $ = s => document.querySelector(s);
-
-    let session = null;
-    let allSpecies = [];
-    let sessionIds = new Set();
-    let obs = [];
-    let thumbs = {};
-    let panelMap = null;
-    let timerRef = null;
-    let panelOpen = false;
-
-    // ── Toggle panel ──
-    function togglePanel(forceOpen) {
-        const panel = $('#panel');
-        const btn = $('#toggle-btn');
-        panelOpen = forceOpen !== undefined ? forceOpen : !panelOpen;
-        panel.classList.toggle('open', panelOpen);
-        btn.classList.toggle('active', panelOpen);
-        $('#toggle-badge').classList.remove('show');
-    }
-
-    $('#toggle-btn').onclick = () => togglePanel();
-
-    async function init() {
-        allSpecies = await loadSpecies();
-        await fetchThumbs();
-        session = await getActive();
-        if (session) {
-            sessionIds = await loadSessionSpecies(session.id);
-            obs = await loadObs(session.id);
-            showPanel();
-        }
-        setupRealtime();
-        setupEvents();
-    }
-
-    async function loadSpecies() {
-        const { data } = await supabase.from('species').select('*').order('subcategory').order('name_fr');
-        return data || [];
-    }
-
-    async function getActive() {
-        const { data } = await supabase.from('observation_sessions').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        return data;
-    }
-
-    async function loadSessionSpecies(sid) {
-        const { data } = await supabase.from('session_species').select('species_id').eq('session_id', sid);
-        return new Set((data || []).map(d => d.species_id));
-    }
-
-    async function loadObs(sid) {
-        const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin, category)').eq('session_id', sid).order('observed_at', { ascending: false });
-        return data || [];
-    }
-
-    async function fetchThumbs() {
-        const entries = allSpecies.filter(s => s.source_url).map(s => {
-            const m = s.source_url.match(/\/wiki\/(.+)$/);
-            return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
-        }).filter(Boolean);
-
-        for (let i = 0; i < entries.length; i += 50) {
-            const batch = entries.slice(i, i + 50);
-            try {
-                const titles = batch.map(e => e.title).join('|');
-                const resp = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=pageimages&format=json&pithumbsize=250&origin=*`);
-                const json = await resp.json();
-                if (!json.query?.pages) continue;
-                const byTitle = {};
-                for (const p of Object.values(json.query.pages)) {
-                    if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
-                }
-                for (const e of batch) {
-                    const key = e.title.replace(/_/g, ' ');
-                    if (byTitle[key]) thumbs[e.id] = byTitle[key];
-                }
-            } catch {}
-        }
-    }
-
-    function getThumb(sp) { return thumbs[sp.id] || sp.photo_url || null; }
-
-    function showPanel() {
-        $('#no-session').style.display = 'none';
-        const main = $('#panel-main');
-        main.style.display = 'flex';
-        $('#p-session-name').textContent = session.title;
-        $('#p-live-dot').style.display = 'block';
-        renderGuide();
-        renderStats();
-        startTimer();
-    }
-
-    function renderGuide() {
-        const container = $('#species-container');
-        const inSession = allSpecies.filter(s => sessionIds.has(s.id));
-        const obsIds = new Set(obs.map(o => o.species_id));
-
-        const grouped = {};
-        for (const sp of inSession) {
-            const k = sp.subcategory || 'Autre';
-            if (!grouped[k]) grouped[k] = [];
-            grouped[k].push(sp);
-        }
-
-        let html = '';
-        for (const [cat, sps] of Object.entries(grouped)) {
-            const seen = sps.filter(s => obsIds.has(s.id)).length;
-            html += `<div class="cat-title">${cat} <span class="cat-count">${seen}/${sps.length}</span></div><div class="s-grid">`;
-            for (const sp of sps) {
-                const isObs = obsIds.has(sp.id);
-                const url = getThumb(sp);
-                const imgHtml = url
-                    ? `<img class="s-thumb" src="${url}" alt="${sp.name_fr}" loading="lazy">`
-                    : `<div class="s-thumb-ph">${sp.category === 'bird' ? '🐦' : '🦊'}</div>`;
-                const last = obs.find(o => o.species_id === sp.id);
-                const t = last ? new Date(last.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
-
-                html += `<div class="s-card ${isObs ? 'observed' : 'not-observed'}" data-id="${sp.id}">${imgHtml}<div class="s-info"><div class="s-name">${sp.name_fr}</div><div class="s-latin">${sp.name_latin}</div>${isObs ? `<span class="s-obs-tag">✓ ${t}</span>` : ''}</div></div>`;
-            }
-            html += '</div>';
-        }
-        container.innerHTML = html;
-    }
-
-    function renderStats() {
-        const obsIds = new Set(obs.map(o => o.species_id));
-        const total = allSpecies.filter(s => sessionIds.has(s.id)).length;
-        $('#st-session').textContent = `${obsIds.size}/${total}`;
-        $('#st-total').textContent = obs.length;
-
-        const list = $('#recent-list');
-        if (!obs.length) { list.innerHTML = '<p style="color:var(--text-dim);font-size:.82rem;">Aucune observation</p>'; return; }
-        list.innerHTML = obs.slice(0, 10).map(o => {
-            const t = new Date(o.observed_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
-            return `<div class="recent-item"><span class="r-time">${t}</span><span class="r-dot"></span><span>${o.species?.name_fr || '?'}</span></div>`;
-        }).join('');
-    }
-
-    function startTimer() {
-        if (!session) return;
-        const start = new Date(session.started_at).getTime();
-        const update = () => {
-            const d = Date.now() - start;
-            const h = Math.floor(d / 3600000);
-            const m = Math.floor((d % 3600000) / 60000);
-            $('#st-duration').textContent = `${h}h${String(m).padStart(2, '0')}`;
-        };
-        update();
-        timerRef = setInterval(update, 30000);
-    }
-
-    function showAlert(sp) {
-        const el = $('#alert');
-        const url = getThumb(sp);
-        const thumb = $('#alert-thumb');
-        if (url) { thumb.src = url; thumb.style.display = 'block'; }
-        else thumb.style.display = 'none';
-        $('#alert-name').textContent = sp.name_fr;
-        $('#alert-latin').textContent = sp.name_latin;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 5000);
-
-        // Flash the badge if panel is closed
-        if (!panelOpen) {
-            const badge = $('#toggle-badge');
-            badge.textContent = '!';
-            badge.classList.add('show');
-        }
-
-        const card = document.querySelector(`.s-card[data-id="${sp.id}"]`);
-        if (card) { card.classList.add('just-seen'); setTimeout(() => card.classList.remove('just-seen'), 2000); }
-    }
-
-    function showDetail(id) {
-        const sp = allSpecies.find(s => s.id === id);
-        if (!sp) return;
-        const url = getThumb(sp);
-        const fields = [
-            ['Habitat', sp.habitat],
-            ['Taille', sp.size],
-            ['Poids', sp.weight],
-            ['Régime', sp.diet],
-            ['Comportement', sp.behavior],
-            ['Statut', sp.conservation_status],
-        ].filter(([, v]) => v);
-
-        const imgHtml = url ? `<img class="detail-img" src="${url}" alt="${sp.name_fr}">` : '';
-
-        $('#detail-content').innerHTML = `
-            ${imgHtml}
-            <div class="detail-body">
-                <h2>${sp.name_fr}</h2>
-                <p class="latin">${sp.name_latin}</p>
-                ${sp.description ? `<p class="desc">${sp.description}</p>` : ''}
-                ${fields.map(([l, v]) => `<p class="field"><strong>${l} :</strong> ${v}</p>`).join('')}
-                ${sp.source_url ? `<p style="margin-top:8px;"><a href="${sp.source_url}" target="_blank" rel="noopener" style="font-size:.8rem;">Wikipédia →</a></p>` : ''}
-                <p class="credit">Photo : ${sp.photo_credit || 'Wikimedia Commons'}</p>
-            </div>
-        `;
-        $('#detail').classList.add('open');
-    }
-
-    function setupRealtime() {
-        supabase.channel('overlay-obs').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'observations' }, async payload => {
-            if (!session || payload.new.session_id !== session.id) return;
-            if (obs.find(o => o.id === payload.new.id)) return;
-
-            const { data } = await supabase.from('observations').select('*, species:species_id(name_fr, name_latin, category)').eq('id', payload.new.id).single();
-            if (!data) return;
-            obs.unshift(data);
-            renderGuide();
-            renderStats();
-
-            const sp = allSpecies.find(s => s.id === data.species_id);
-            if (sp) showAlert(sp);
-        }).subscribe();
-
-        supabase.channel('overlay-session').on('postgres_changes', { event: '*', schema: 'public', table: 'observation_sessions' }, async () => {
-            const newSession = await getActive();
-            if (newSession && (!session || newSession.id !== session.id)) {
-                session = newSession;
-                sessionIds = await loadSessionSpecies(session.id);
-                obs = await loadObs(session.id);
-                showPanel();
-            } else if (!newSession && session) {
-                session = null;
-                sessionIds.clear();
-                obs = [];
-                clearInterval(timerRef);
-                $('#no-session').style.display = 'block';
-                $('#panel-main').style.display = 'none';
-                $('#p-live-dot').style.display = 'none';
-            }
-        }).subscribe();
-    }
-
-    function setupEvents() {
-        document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const name = tab.dataset.tab;
-            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-            const target = $(`#tab-${name === 'carte' ? 'carte' : name === 'stats' ? 'stats' : 'guide'}`);
-            if (target) target.classList.add('active');
-            if (name === 'carte') setTimeout(initMap, 50);
-        });
-
-        document.addEventListener('click', e => {
-            const card = e.target.closest('.s-card');
-            if (card?.dataset.id) { showDetail(card.dataset.id); return; }
-        });
-
-        $('#detail-back').onclick = () => $('#detail').classList.remove('open');
-    }
-
-    function initMap() {
-        if (panelMap) { panelMap.remove(); panelMap = null; }
-        const lat = session?.latitude || 46.5;
-        const lng = session?.longitude || 2.5;
-        const zoom = session?.latitude ? 13 : 6;
-        panelMap = L.map('panel-map').setView([lat, lng], zoom);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(panelMap);
-        if (session?.latitude) L.marker([lat, lng]).addTo(panelMap).bindPopup(session.location_name || '📍').openPopup();
-        setTimeout(() => panelMap.invalidateSize(), 200);
-    }
-
-    init();
-</script>
+    <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="shared.js"></script>
+    <script src="viewer.js"></script>
 </body>
 </html>
