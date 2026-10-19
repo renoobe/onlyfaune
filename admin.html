@@ -315,6 +315,17 @@
     </style>
 </head>
 <body>
+    <!-- Connexion admin (les écritures en base sont réservées au compte admin) -->
+    <div id="login" class="hidden" style="position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <form id="login-form" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:360px;width:100%;display:grid;gap:10px;">
+            <h2 style="color:var(--gold);">🦉 OnlyFaune – Admin</h2>
+            <input type="email" id="login-email" placeholder="Email" autocomplete="username" required>
+            <input type="password" id="login-pass" placeholder="Mot de passe" autocomplete="current-password" required>
+            <button type="submit" class="btn btn-primary">Se connecter</button>
+            <p id="login-err" style="color:#ef4444;font-size:.85rem;"></p>
+        </form>
+    </div>
+
     <header class="header">
         <div class="header-brand">
             <h1>OnlyFaune</h1>
@@ -322,6 +333,7 @@
         <div class="header-right">
             <div id="status" class="status offline">Hors session</div>
             <button id="btn-end" class="btn btn-danger btn-small hidden">Terminer</button>
+            <button id="btn-logout" class="btn btn-secondary btn-small">Déconnexion</button>
         </div>
     </header>
 
@@ -929,8 +941,20 @@
             $('#sp-subcats').innerHTML = [...new Set(allSpecies.map(s => s.subcategory).filter(Boolean))].map(c => `<option value="${c}">`).join('');
         }
 
-        // ── Start ──
-        init();
+        // ── Start : connexion obligatoire ──
+        async function boot() {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) { $('#login').classList.add('hidden'); init(); return; }
+            $('#login').classList.remove('hidden');
+        }
+        $('#login-form').onsubmit = async e => {
+            e.preventDefault();
+            const { error } = await supabase.auth.signInWithPassword({ email: $('#login-email').value.trim(), password: $('#login-pass').value });
+            if (error) { $('#login-err').textContent = 'Connexion refusée : ' + error.message; return; }
+            location.reload();
+        };
+        $('#btn-logout').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
+        boot();
     </script>
 </body>
 </html>
