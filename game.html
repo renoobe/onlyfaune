@@ -142,8 +142,8 @@
             if (s.game === 'idle') { if (curKey !== 'idle') { fadeOut(main); curKey = 'idle'; curStatus = ''; } return; }
 
             const same = key === curKey;
-            if (same && s.game === 'photo' && s.status === curStatus) return patchPhoto(p);
-            if (same && s.game === 'duel' && s.status === curStatus) return patchDuel(p);
+            if (same && s.game === 'photo' && s.status === curStatus) { patchPhoto(p); armTimer(s); return; }
+            if (same && s.game === 'duel' && s.status === curStatus) { patchDuel(p); armTimer(s); return; }
             if (same && s.game === 'devinette' && s.status === curStatus && p.hints && p.hints.length === shownHints) { armTimer(s); return; }
             // Nouvel indice : on ajoute seulement la ligne, sans toucher au reste de la carte
             if (same && s.game === 'devinette' && s.status === 'playing' && curStatus === 'playing' && p.hints && p.hints.length > shownHints && main.querySelector('.card')) {
