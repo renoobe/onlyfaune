@@ -47,8 +47,10 @@
         .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 8px; }
         .bar > div { height: 100%; width: 0; background: var(--gold); transition: width .25s linear; }
         .muted { color: var(--text-dim); font-size: .85rem; }
-        .feed { margin-top: 10px; display: grid; gap: 3px; font-size: .85rem; max-height: 200px; overflow-y: auto; }
-        .feed div { padding: 3px 8px; border-radius: 6px; background: var(--bg); }
+        .feed { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; font-size: .85rem; height: 14rem; overflow: hidden; border-radius: var(--radius-sm); background: rgba(255,255,255,.02); }
+        .feed div { flex: none; padding: 3px 8px; border-radius: 6px; background: var(--bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #round-live { min-height: 9.5rem; }
+        #r-info { min-height: 1.4rem; } #r-winner { min-height: 1.6rem; }
         .feed .hit { background: rgba(64,145,108,.25); color: #8ef0c0; }
         .feed .vote { background: rgba(212,168,66,.12); }
         .feed b { color: var(--gold); font-weight: 600; }
@@ -78,7 +80,7 @@
         <h1>🎮 Mini-jeux</h1>
         <div class="header-right">
             <span id="chat-pill" class="pill">Chat déconnecté</span>
-            <a href="admin.html" class="btn btn-secondary btn-small">← Admin</a>
+            <a href="admin.html" class="btn btn-secondary btn-small">🦉 Admin extension</a>
         </div>
     </header>
 
@@ -106,10 +108,12 @@
                 <button data-game="duel">⚖️ Plus lourd / grand</button>
             </div>
             <div class="row" style="margin-top:12px;">
-                <div><label id="lbl-delay" for="delay">Délai entre indices (s)</label><input type="number" id="delay" min="3" max="120" value="15"></div>
+                <div><label id="lbl-delay" for="delay">Délai entre indices (s)</label><input type="number" id="delay" min="3" max="600" value="45"></div>
                 <div><label for="cat">Espèces</label>
                     <select id="cat"><option value="">Toutes</option><option value="bird">Oiseaux</option><option value="mammal">Mammifères</option></select></div>
-                <div><label for="pause">Pause entre manches (s)</label><input type="number" id="pause" min="3" max="120" value="12"></div>
+                <div><label for="fx">Effet photo</label>
+                    <select id="fx"><option value="zoom">Dézoom</option><option value="pixel">Pixelisé</option></select></div>
+                <div><label for="pause">Pause entre manches (s)</label><input type="number" id="pause" min="3" max="600" value="45"></div>
             </div>
             <div class="checks">
                 <label><input type="checkbox" id="chain"> Enchaîner automatiquement (phases d'attente)</label>
@@ -172,8 +176,8 @@
         const $ = s => document.querySelector(s);
         const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-        const BLURS = [30, 22, 15, 10, 6, 3, 0];            // étapes de la photo qui se dévoile
-        const DEFAULT_DELAY = { devinette: 15, photo: 12, duel: 30 };
+        const STEPS = 7;                                    // étapes de la photo qui se dévoile
+        const DEFAULT_DELAY = { devinette: 45, photo: 35, duel: 90 };   // secondes (modifiables, mémorisées par jeu)
 
         let species = [];
         let images = {};                // species.id -> url (Wikipédia)
@@ -183,7 +187,7 @@
         let round = 0;
         let cur = null;                 // manche en cours
         let used = new Set();           // espèces déjà tirées (évite les répétitions)
-        let delays = { ...DEFAULT_DELAY };
+        let delays = { ...DEFAULT_DELAY };      // complété depuis les préférences au démarrage
 
         // ── Préférences (facultatif : peut être indisponible) ──
         const store = {
@@ -339,7 +343,7 @@
                 const withImg = pool.filter(s => images[s.id]);
                 if (!withImg.length) { toast('Aucune photo disponible (Wikipédia injoignable ?).'); round--; return; }
                 const sp = pickSpecies(withImg);
-                cur = { game, sp, aliases: GC.buildAliases(sp, species), status: 'playing', step: 0, dur: delayMs(), nextAt: t + delayMs(), finalWait: false, winner: null };
+                cur = { game, sp, aliases: GC.buildAliases(sp, species), status: 'playing', step: 0, fx: $('#fx').value, origin: `${35 + Math.round(Math.random() * 30)}% ${30 + Math.round(Math.random() * 30)}%`, dur: delayMs(), nextAt: t + delayMs(), finalWait: false, winner: null };
             } else {
                 const criterion = Math.random() < 0.5 ? 'weight' : 'size';
                 const d = GC.pickDuel(pool, criterion);
@@ -356,7 +360,7 @@
             if (c.game === 'devinette') {
                 Object.assign(p, { hints: c.hints.slice(0, c.shown), total: c.hints.length, dur: c.dur, next_at: c.status === 'playing' ? nowIso(c.nextAt) : null });
             } else if (c.game === 'photo') {
-                Object.assign(p, { image: images[c.sp.id], blur: c.status === 'playing' ? BLURS[c.step] : 0, step: c.step + 1, total: BLURS.length, dur: c.dur, next_at: c.status === 'playing' ? nowIso(c.nextAt) : null });
+                Object.assign(p, { image: images[c.sp.id], mode: c.fx, origin: c.origin, step: c.step + 1, total: STEPS, dur: c.dur, next_at: c.status === 'playing' ? nowIso(c.nextAt) : null });
             } else {
                 const counts = voteCounts();
                 Object.assign(p, {
@@ -388,7 +392,7 @@
         function advance() {
             if (!cur || cur.status !== 'playing') return;
             if (cur.game === 'duel') { revealRound(); return; }
-            const last = cur.game === 'devinette' ? cur.shown >= cur.hints.length : cur.step >= BLURS.length - 1;
+            const last = cur.game === 'devinette' ? cur.shown >= cur.hints.length : cur.step >= STEPS - 1;
             if (!last) {
                 cur.game === 'devinette' ? cur.shown++ : cur.step++;
                 cur.dur = delayMs(); cur.nextAt = Date.now() + cur.dur;
@@ -466,7 +470,7 @@
                 info = `A : ${c.a.name_fr}  ·  B : ${c.b.name_fr}  —  votes : A ${v.a} / B ${v.b}`;
             } else {
                 $('#r-answer').textContent = c.sp.name_fr;
-                info = c.game === 'devinette' ? `Indice ${c.shown}/${c.hints.length}${c.finalWait ? ' (dernière chance)' : ''}` : `Étape ${c.step + 1}/${BLURS.length}${c.finalWait ? ' (dernière chance)' : ''}`;
+                info = c.game === 'devinette' ? `Indice ${c.shown}/${c.hints.length}${c.finalWait ? ' (dernière chance)' : ''}` : `Étape ${c.step + 1}/${STEPS}${c.finalWait ? ' (dernière chance)' : ''}`;
             }
             $('#r-info').textContent = info;
             $('#r-winner').textContent = c.status === 'revealed'
@@ -522,14 +526,14 @@
 
         $('#seg').onclick = e => {
             const b = e.target.closest('button'); if (!b) return;
-            delays[game] = +$('#delay').value || DEFAULT_DELAY[game];
             game = b.dataset.game;
             document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('active', x === b));
             $('#delay').value = delays[game];
             $('#lbl-delay').textContent = game === 'duel' ? 'Durée du vote (s)' : game === 'photo' ? 'Délai entre étapes (s)' : 'Délai entre indices (s)';
             store.set('game', game);
         };
-        for (const id of ['cat', 'pause', 'chain', 'lb', 'ignore']) {
+        $('#delay').onchange = () => { delays[game] = Math.max(3, +$('#delay').value || DEFAULT_DELAY[game]); store.set('delays', delays); };
+        for (const id of ['cat', 'pause', 'chain', 'lb', 'ignore', 'fx']) {
             $('#' + id).onchange = () => store.set(id, $('#' + id).type === 'checkbox' ? $('#' + id).checked : $('#' + id).value);
         }
 
@@ -538,7 +542,9 @@
             $('#channel').value = store.get('channel', 'renoube');
             $('#ignore').value = store.get('ignore', 'nightbot, streamelements, moobot, streamlabs, wizebot');
             $('#cat').value = store.get('cat', '');
-            $('#pause').value = store.get('pause', 12);
+            $('#pause').value = store.get('pause', 45);
+            $('#fx').value = store.get('fx', 'zoom');
+            delays = { ...DEFAULT_DELAY, ...store.get('delays', {}) };
             $('#chain').checked = store.get('chain', false);
             $('#lb').checked = store.get('lb', true);
             const g = store.get('game', 'devinette');
