@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune – Overlay jeux (OBS)</title>
+    <!--
+      Source navigateur OBS : 1920 x 1080, fond transparent.
+      Options : ?pos=right (jeu à droite)   ?lb=off (sans classement)   ?bg=1 (damier, pour prévisualiser la transparence)
+      Aperçu sans base : ?demo=devinette | devinette-reveal | photo | photo-reveal | duel | duel-reveal | lb
+    -->
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: calc(100vh / 54); }               /* 1 rem = 20 px en 1080p, s'adapte à la hauteur */
+        body {
+            background: transparent; color: #f2f4f8; overflow: hidden; height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+        }
+        body.checker { background: #2b2f36 conic-gradient(#3a3f48 25%, #2b2f36 0 50%, #3a3f48 0 75%, #2b2f36 0) 0 0 / 2rem 2rem; }
+
+        #stage { position: fixed; inset: 2.4rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; pointer-events: none; }
+        body.pos-right #stage { flex-direction: row-reverse; }
+        #main { align-self: center; }
+        #side { align-self: flex-start; }
+        body.nolb #side { display: none; }
+
+        .card {
+            background: rgba(13, 17, 23, .88); border: .14rem solid rgba(212, 168, 66, .6); border-radius: 1.1rem;
+            padding: 1.2rem 1.4rem 1.3rem; box-shadow: 0 .8rem 2.4rem rgba(0, 0, 0, .45); backdrop-filter: blur(.4rem);
+            animation: cardIn .45s cubic-bezier(.2, .9, .3, 1.2) both;
+        }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(1.4rem) scale(.97); } to { opacity: 1; transform: none; } }
+        .card.out { animation: cardOut .35s ease both; }
+        @keyframes cardOut { to { opacity: 0; transform: translateY(1rem) scale(.97); } }
+
+        .head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .7rem; }
+        .ttl { font-size: 1.15rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #f0c850; }
+        .cnt { font-size: .95rem; font-weight: 700; color: #9aa4b2; white-space: nowrap; }
+        .timer { height: .4rem; background: rgba(255, 255, 255, .1); border-radius: .2rem; overflow: hidden; margin-bottom: .9rem; }
+        .timer i { display: block; height: 100%; width: 100%; transition: width .12s linear; background: linear-gradient(90deg, #d4a842, #f0c850); border-radius: .2rem; }
+
+        /* Devinette */
+        #main .w-dev { width: 34rem; }
+        .hint { padding: .55rem .8rem; margin-top: .5rem; background: rgba(255, 255, 255, .06); border-left: .25rem solid #d4a842; border-radius: .5rem; }
+        .hint small { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #d4a842; }
+        .hint span { font-size: 1.22rem; line-height: 1.3; }
+        .hint.pop { animation: hintIn .55s cubic-bezier(.2, .9, .3, 1.3) both, hintGlow 1.6s ease-out; }
+        @keyframes hintIn { from { opacity: 0; transform: translateX(-1.6rem) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes hintGlow { 0% { background: rgba(240, 200, 80, .45); } 100% { background: rgba(255, 255, 255, .06); } }
+        .hint.pattern span { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .12em; font-size: 1.5rem; font-weight: 700; color: #f0c850; }
+
+        /* Photo */
+        #main .w-photo { width: 34rem; }
+        .photo { position: relative; width: 100%; height: 23rem; border-radius: .8rem; overflow: hidden; background: #0d1117; }
+        .photo img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.2); transition: filter 1.4s ease, transform 1.4s ease; }
+        .photo img.clear { transform: scale(1); }
+        .photo .noimg { display: grid; place-items: center; height: 100%; font-size: 6rem; }
+        .dots { display: flex; gap: .4rem; margin-top: .8rem; justify-content: center; }
+        .dots b { width: .8rem; height: .8rem; border-radius: 50%; background: rgba(255, 255, 255, .18); }
+        .dots b.on { background: #f0c850; }
+
+        /* Révélation */
+        .reveal { text-align: center; animation: hintIn .6s cubic-bezier(.2, .9, .3, 1.3) both; }
+        .reveal img { width: 100%; height: 17rem; object-fit: cover; border-radius: .8rem; margin-bottom: .8rem; }
+        .reveal .name { font-size: 2.2rem; font-weight: 800; color: #f0c850; line-height: 1.1; }
+        .reveal .latin { font-size: 1.1rem; font-style: italic; color: #9aa4b2; margin-top: .2rem; }
+        .reveal .who { margin-top: .9rem; font-size: 1.35rem; font-weight: 700; }
+        .reveal .who.win { color: #56d39b; } .reveal .who.none { color: #9aa4b2; font-weight: 600; }
+
+        /* Duel */
+        #main .w-duel { width: 44rem; }
+        .q { text-align: center; font-size: 1.7rem; font-weight: 800; margin-bottom: .9rem; }
+        .duel { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .tile { position: relative; background: rgba(255, 255, 255, .06); border: .14rem solid transparent; border-radius: .9rem; padding: .7rem; text-align: center; transition: opacity .6s, border-color .6s, box-shadow .6s; }
+        .tile .badge { position: absolute; top: .5rem; left: .5rem; z-index: 2; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; background: #d4a842; color: #000; font-weight: 900; font-size: 1.2rem; }
+        .tile .pic { height: 12rem; border-radius: .6rem; overflow: hidden; background: #0d1117; display: grid; place-items: center; font-size: 4rem; }
+        .tile .pic img { width: 100%; height: 100%; object-fit: cover; }
+        .tile .nm { font-size: 1.3rem; font-weight: 800; margin: .6rem 0 .4rem; min-height: 1.6rem; }
+        .vote { height: 1.4rem; background: rgba(255, 255, 255, .1); border-radius: .7rem; overflow: hidden; }
+        .vote i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #d4a842, #f0c850); transition: width .8s ease; }
+        .vcount { margin-top: .3rem; font-size: .95rem; color: #9aa4b2; font-weight: 600; }
+        .val { margin-top: .4rem; font-size: 1.6rem; font-weight: 800; color: #f0c850; animation: hintIn .6s both; }
+        .tile.good { border-color: #56d39b; box-shadow: 0 0 1.6rem rgba(86, 211, 155, .5); }
+        .tile.good::after { content: '✓'; position: absolute; top: .4rem; right: .6rem; font-size: 2rem; font-weight: 900; color: #56d39b; z-index: 2; }
+        .tile.bad { opacity: .45; }
+        .help { margin-top: .9rem; text-align: center; font-size: 1.05rem; color: #9aa4b2; }
+        .help b { color: #f0c850; }
+
+        /* Classement */
+        .lb { width: 15.5rem; }
+        .lb .ttl { font-size: .95rem; }
+        .lb ol { list-style: none; margin-top: .4rem; }
+        .lb li { display: flex; align-items: center; gap: .6rem; padding: .35rem .4rem; border-radius: .5rem; font-size: 1.05rem; }
+        .lb li .r { width: 1.5rem; text-align: center; font-weight: 800; color: #9aa4b2; }
+        .lb li:nth-child(1) .r { color: #f0c850; } .lb li:nth-child(2) .r { color: #cfd6df; } .lb li:nth-child(3) .r { color: #cd8c52; }
+        .lb li .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+        .lb li .p { font-weight: 800; color: #f0c850; }
+        .lb li.bump { animation: bump 1.6s ease-out; }
+        @keyframes bump { 0% { background: rgba(86, 211, 155, .5); transform: scale(1.05); } 100% { background: transparent; transform: none; } }
+        .lb .empty { padding: .6rem .2rem; color: #9aa4b2; font-size: .95rem; }
+        .lb.big { width: 28rem; }
+        .lb.big .ttl { font-size: 1.4rem; } .lb.big li { font-size: 1.4rem; padding: .5rem .6rem; }
+    </style>
+</head>
+<body>
+    <div id="stage"><div id="main"></div><div id="side"></div></div>
+
+    <script>
+    (function () {
+        'use strict';
+        const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
+
+        const q = new URLSearchParams(location.search);
+        document.body.classList.toggle('pos-right', q.get('pos') === 'right');
+        document.body.classList.toggle('nolb', q.get('lb') === 'off');
+        document.body.classList.toggle('checker', q.has('bg'));
+
+        const $ = s => document.querySelector(s);
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const safeUrl = u => (/^https:\/\//.test(u || '') ? esc(u) : '');
+        const rest = async path => {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+        };
+
+        let curKey = '';        // jeu:manche affichés
+        let curStatus = '';
+        let shownHints = 0;
+        let scores = [];
+        let prevPoints = {};
+        let timerEnd = 0, timerDur = 1, timerOn = false;
+
+        // ── Rendu principal ──
+        function renderMain(s) {
+            const main = $('#main');
+            const p = s.payload || {};
+            const key = s.game + ':' + s.round;
+
+            if (s.game === 'idle') { if (curKey !== 'idle') { fadeOut(main); curKey = 'idle'; curStatus = ''; } return; }
+
+            const same = key === curKey;
+            if (same && s.game === 'photo' && s.status === curStatus) return patchPhoto(p);
+            if (same && s.game === 'duel' && s.status === curStatus) return patchDuel(p);
+            if (same && s.game === 'devinette' && s.status === curStatus && p.hints && p.hints.length === shownHints) { armTimer(s); return; }
+
+            main.innerHTML = s.game === 'devinette' ? htmlDev(s, p, same)
+                : s.game === 'photo' ? htmlPhoto(s, p)
+                : s.game === 'duel' ? htmlDuel(s, p)
+                : htmlBoard();
+            curKey = key; curStatus = s.status;
+            armTimer(s);
+        }
+
+        function fadeOut(el) {
+            const c = el.firstElementChild;
+            if (!c) return;
+            c.classList.add('out');
+            setTimeout(() => { if (curKey === 'idle') el.innerHTML = ''; }, 380);
+        }
+
+        // Compte à rebours : mesuré depuis l'arrivée de l'état (pas d'écart d'horloge entre PC).
+        function armTimer(s) {
+            const p = s.payload || {};
+            const end = s.game === 'duel' ? p.ends_at : p.next_at;
+            if (s.status !== 'playing' || !end || !p.dur) { timerOn = false; const i = document.querySelector('.timer i'); if (i) i.style.width = '0%'; return; }
+            const left = Math.max(0, new Date(end) - new Date(s.updated_at));
+            timerEnd = Date.now() + left; timerDur = p.dur; timerOn = true;
+        }
+        setInterval(() => {
+            if (!timerOn) return;
+            const i = document.querySelector('.timer i');
+            if (i) i.style.width = Math.max(0, Math.min(100, ((timerEnd - Date.now()) / timerDur) * 100)) + '%';
+        }, 100);
+
+        // Devinette
+        function htmlDev(s, p, same) {
+            const hints = p.hints || [];
+            const from = same ? shownHints : 0;     // seuls les nouveaux indices s'animent
+            shownHints = hints.length;
+            let body;
+            if (s.status === 'revealed') body = reveal(p);
+            else body = '<div class="timer"><i></i></div>' + hints.map((h, i) => `<div class="hint${h.label === 'Lettres' ? ' pattern' : ''}${i >= from ? ' pop' : ''}"><small>${esc(h.label)}</small><span>${esc(h.text)}</span></div>`).join('');
+            return `<div class="card w-dev"><div class="head"><span class="ttl">🦉 Quel animal suis-je ?</span><span class="cnt">${s.status === 'revealed' ? '' : `Indice ${hints.length}/${p.total || '?'}`}</span></div>${body}</div>`;
+        }
+
+        function reveal(p) {
+            const a = p.answer || {};
+            return `<div class="reveal">${safeUrl(a.image) ? `<img src="${safeUrl(a.image)}" alt="">` : ''}
+                <div class="name">${esc(a.name)}</div><div class="latin">${esc(a.latin)}</div>
+                <div class="who ${p.winner ? 'win' : 'none'}">${p.winner ? '🏆 ' + esc(p.winner) + ' a trouvé !' : 'Personne n\'a trouvé…'}</div></div>`;
+        }
+
+        // Photo
+        function htmlPhoto(s, p) {
+            const img = safeUrl(p.image);
+            const head = `<div class="head"><span class="ttl">📷 Qui est-ce ?</span><span class="cnt">${s.status === 'revealed' ? '' : `Étape ${p.step || 1}/${p.total || '?'}`}</span></div>`;
+            if (s.status === 'revealed') {
+                return `<div class="card w-photo">${head}${reveal({ ...p, answer: { ...p.answer, image: null } }).replace('<div class="reveal">', `<div class="reveal"><div class="photo" style="margin-bottom:.8rem">${img ? `<img class="clear" src="${img}" alt="">` : ''}</div>`)}</div>`;
+            }
+            return `<div class="card w-photo">${head}<div class="timer"><i></i></div>
+                <div class="photo">${img ? `<img src="${img}" alt="" style="filter:blur(${p.blur || 0}px)"${p.blur ? '' : ' class="clear"'}>` : '<div class="noimg">🐾</div>'}</div>
+                <div class="dots">${Array.from({ length: p.total || 7 }, (_, i) => `<b class="${i < (p.step || 1) ? 'on' : ''}"></b>`).join('')}</div></div>`;
+        }
+        function patchPhoto(p) {
+            const img = document.querySelector('.photo img');
+            if (img) { img.style.filter = `blur(${p.blur || 0}px)`; img.classList.toggle('clear', !p.blur); }
+            document.querySelectorAll('.dots b').forEach((b, i) => b.classList.toggle('on', i < (p.step || 1)));
+            const c = document.querySelector('.cnt'); if (c) c.textContent = `Étape ${p.step || 1}/${p.total || '?'}`;
+        }
+
+        // Duel
+        function tile(side, t, p, res) {
+            const v = p.votes || { a: 0, b: 0 }; const tot = (v.a + v.b) || 1;
+            const cls = res ? (res.winner === side ? ' good' : ' bad') : '';
+            const img = safeUrl(t.image);
+            return `<div class="tile${cls}" data-side="${side}"><div class="badge">${side.toUpperCase()}</div>
+                <div class="pic">${img ? `<img src="${img}" alt="">` : '🐾'}</div><div class="nm">${esc(t.name)}</div>
+                ${res ? `<div class="val">${esc(res[side])}</div>` : `<div class="vote"><i style="width:${Math.round(v[side] / tot * 100)}%"></i></div>`}
+                <div class="vcount">${v[side]} vote${v[side] > 1 ? 's' : ''}</div></div>`;
+        }
+        function htmlDuel(s, p) {
+            const res = s.status === 'revealed' ? p.result : null;
+            return `<div class="card w-duel"><div class="head"><span class="ttl">⚖️ Duel</span><span class="cnt">${res ? `${res.correct} bonne${res.correct > 1 ? 's' : ''} réponse${res.correct > 1 ? 's' : ''}` : ''}</span></div>
+                <div class="q">${esc(p.question)}</div>${res ? '' : '<div class="timer"><i></i></div>'}
+                <div class="duel">${tile('a', p.a || {}, p, res)}${tile('b', p.b || {}, p, res)}</div>
+                ${res ? '' : '<div class="help">Tapez <b>!a</b> ou <b>!b</b> dans le chat</div>'}</div>`;
+        }
+        function patchDuel(p) {
+            const v = p.votes || { a: 0, b: 0 }; const tot = (v.a + v.b) || 1;
+            for (const side of ['a', 'b']) {
+                const t = document.querySelector(`.tile[data-side="${side}"]`); if (!t) continue;
+                const bar = t.querySelector('.vote i'); if (bar) bar.style.width = Math.round(v[side] / tot * 100) + '%';
+                t.querySelector('.vcount').textContent = `${v[side]} vote${v[side] > 1 ? 's' : ''}`;
+            }
+        }
+
+        // Classement
+        function listHtml(n) {
+            if (!scores.length) return '<div class="empty">Aucun point pour l\'instant</div>';
+            return '<ol>' + scores.slice(0, n).map((r, i) => `<li data-l="${esc(r.login)}"><span class="r">${i + 1}</span><span class="n">${esc(r.display_name)}</span><span class="p">${r.points}</span></li>`).join('') + '</ol>';
+        }
+        const htmlBoard = () => `<div class="card lb big"><div class="head"><span class="ttl">🏆 Classement</span></div>${listHtml(10)}</div>`;
+
+        function renderSide(s) {
+            const side = $('#side');
+            const showSide = s.game !== 'idle' && s.game !== 'leaderboard' && (s.payload || {}).lb !== false;
+            if (!showSide) { side.innerHTML = ''; return; }
+            side.innerHTML = `<div class="card lb"><div class="head"><span class="ttl">🏆 Classement</span></div>${listHtml(5)}</div>`;
+        }
+
+        function applyScores(list, flash) {
+            const old = prevPoints;
+            scores = list;
+            prevPoints = Object.fromEntries(list.map(r => [r.login, r.points]));
+            if (state) { renderSide(state); if (state.game === 'leaderboard') $('#main').innerHTML = htmlBoard(); }
+            if (flash) document.querySelectorAll('.lb li').forEach(li => { if (old[li.dataset.l] != null && prevPoints[li.dataset.l] > old[li.dataset.l]) li.classList.add('bump'); });
+        }
+
+        // ── Boucle de lecture ──
+        let state = null, lastStamp = '', lastScoreAt = 0;
+        async function pollState() {
+            try {
+                const rows = await rest('game_state?id=eq.1&select=*');
+                const s = rows[0];
+                if (s) {
+                    const stamp = s.updated_at + '|' + s.round + '|' + s.status;
+                    if (stamp !== lastStamp) {
+                        lastStamp = stamp; state = s;
+                        const wantScores = s.status === 'revealed' || s.game === 'leaderboard' || !scores.length;
+                        if (wantScores) await pollScores(true);
+                        renderMain(s); renderSide(s);
+                    }
+                }
+                if (state && state.game !== 'idle' && Date.now() - lastScoreAt > 6000) pollScores(true);
+            } catch (e) { /* on réessaie au prochain tour */ }
+        }
+        async function pollScores(flash) {
+            lastScoreAt = Date.now();
+            try { applyScores(await rest('game_scores?select=login,display_name,points&order=points.desc&order=updated_at.asc&limit=10'), flash); } catch (e) { /* ignoré */ }
+        }
+
+        // ── Mode démo (aperçu sans base) ──
+        const demo = q.get('demo');
+        if (demo) {
+            scores = [{ login: 'a', display_name: 'MartinPêcheur', points: 14 }, { login: 'b', display_name: 'Clémence_', points: 11 }, { login: 'c', display_name: 'LeGeai', points: 9 }, { login: 'd', display_name: 'ouistiti42', points: 4 }, { login: 'e', display_name: 'Anne', points: 2 }];
+            const img = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ce/%D0%9B%D0%B0%D0%B7%D0%BE%D1%80%D0%B5%D0%B2%D0%BA%D0%B0_%28Cyanistes_caeruleus%29%2C_%D0%91%D0%B8%D1%82%D1%86%D0%B5%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BB%D0%B5%D1%81.jpg/960px-%D0%9B%D0%B0%D0%B7%D0%BE%D1%80%D0%B5%D0%B2%D0%BA%D0%B0_%28Cyanistes_caeruleus%29%2C_%D0%91%D0%B8%D1%82%D1%86%D0%B5%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BB%D0%B5%D1%81.jpg?utm_source=fr.wikipedia.org&utm_campaign=api&utm_content=thumbnail';
+            const now = new Date().toISOString();
+            const hints = [{ label: 'Catégorie', text: 'Un oiseau' }, { label: 'Habitat', text: 'Jardins, parcs, forêts de feuillus, haies' }, { label: 'Régime', text: 'Insectes, chenilles, araignées, graines et baies en hiver' }, { label: 'Taille', text: '11-12 cm' }];
+            const answer = { name: 'Mésange bleue', latin: 'Cyanistes caeruleus', image: img };
+            const states = {
+                devinette: { game: 'devinette', status: 'playing', round: 1, payload: { hints, total: 8, dur: 15000, next_at: new Date(Date.now() + 9000).toISOString() } },
+                'devinette-reveal': { game: 'devinette', status: 'revealed', round: 1, payload: { hints, total: 8, answer, winner: 'MartinPêcheur' } },
+                photo: { game: 'photo', status: 'playing', round: 1, payload: { image: img, blur: 10, step: 4, total: 7, dur: 12000, next_at: new Date(Date.now() + 7000).toISOString() } },
+                'photo-reveal': { game: 'photo', status: 'revealed', round: 1, payload: { image: img, blur: 0, step: 7, total: 7, answer, winner: null } },
+                duel: { game: 'duel', status: 'playing', round: 1, payload: { question: 'Lequel est le plus lourd ?', a: { name: 'Renard roux', image: img }, b: { name: 'Hérisson d\'Europe', image: null }, votes: { a: 7, b: 3 }, dur: 30000, ends_at: new Date(Date.now() + 18000).toISOString() } },
+                'duel-reveal': { game: 'duel', status: 'revealed', round: 1, payload: { question: 'Lequel est le plus lourd ?', a: { name: 'Renard roux', image: img }, b: { name: 'Hérisson d\'Europe', image: null }, votes: { a: 7, b: 3 }, result: { winner: 'a', a: '≈ 7,5 kg', b: '≈ 800 g', correct: 7 } } },
+                lb: { game: 'leaderboard', status: 'playing', round: 1, payload: {} },
+            };
+            const s = states[demo] || states.devinette;
+            s.updated_at = now; state = s;
+            renderMain(s); renderSide(s);
+        } else {
+            pollState(); setInterval(pollState, 1000);
+        }
+    })();
+    </script>
+</body>
+</html>

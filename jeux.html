@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune – Mini-jeux (backoffice)</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0d1117; --bg-card: #161b22; --bg-elevated: #1c2333; --border: #30363d;
+            --text: #e6edf3; --text-dim: #8b949e; --gold: #d4a842; --gold-bright: #f0c850;
+            --green: #2d6a4f; --green-bright: #40916c; --red: #da3633; --radius: 12px; --radius-sm: 8px;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100dvh; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 1.3rem; color: var(--gold); font-weight: 800; letter-spacing: -0.02em; }
+        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        main { max-width: 760px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+        .card h2 { color: var(--gold); font-size: 1.05rem; margin-bottom: 12px; }
+        .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+        .row > * { flex: 1; min-width: 130px; }
+        label { display: block; font-size: .8rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
+        input[type=text], input[type=number], input[type=email], input[type=password], select {
+            width: 100%; padding: 9px 11px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .95rem; outline: none;
+        }
+        input:focus, select:focus { border-color: var(--gold); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border: none; border-radius: var(--radius-sm); font-size: .95rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: all .15s; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-primary { background: var(--gold); color: #000; }
+        .btn-primary:hover:not(:disabled) { background: var(--gold-bright); }
+        .btn-secondary { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: rgba(218,54,51,.12); color: #f85149; border: 1px solid rgba(218,54,51,.3); }
+        .btn-small { padding: 5px 10px; font-size: .8rem; }
+        .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: .8rem; font-weight: 600; background: rgba(139,148,158,.12); color: var(--text-dim); }
+        .pill.on { background: rgba(64,145,108,.18); color: #56d39b; }
+        .pill.err { background: rgba(218,54,51,.12); color: #f85149; }
+        .seg { display: flex; gap: 4px; background: var(--bg); border-radius: var(--radius-sm); padding: 4px; border: 1px solid var(--border); }
+        .seg button { flex: 1; padding: 9px 6px; border: none; border-radius: 6px; background: transparent; color: var(--text-dim); font-weight: 600; cursor: pointer; font-size: .9rem; }
+        .seg button.active { background: var(--gold); color: #000; }
+        .checks { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: .9rem; }
+        .checks label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-weight: 500; }
+        .secret { background: rgba(212,168,66,.08); border: 1px dashed var(--gold); border-radius: var(--radius-sm); padding: 10px 14px; margin: 12px 0; }
+        .secret b { color: var(--gold-bright); font-size: 1.15rem; }
+        .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .bar > div { height: 100%; width: 0; background: var(--gold); transition: width .25s linear; }
+        .muted { color: var(--text-dim); font-size: .85rem; }
+        .feed { margin-top: 10px; display: grid; gap: 3px; font-size: .85rem; max-height: 200px; overflow-y: auto; }
+        .feed div { padding: 3px 8px; border-radius: 6px; background: var(--bg); }
+        .feed .hit { background: rgba(64,145,108,.25); color: #8ef0c0; }
+        .feed .vote { background: rgba(212,168,66,.12); }
+        .feed b { color: var(--gold); font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+        td, th { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-dim); font-weight: 600; font-size: .8rem; }
+        td.n { width: 36px; color: var(--text-dim); } td.p { text-align: right; font-weight: 700; color: var(--gold-bright); }
+        code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: .82rem; word-break: break-all; }
+        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--bg-elevated); border: 1px solid var(--border); padding: 10px 20px; border-radius: var(--radius); font-size: .9rem; z-index: 600; transition: transform .3s; max-width: 90%; text-align: center; }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- Connexion (même compte que l'admin : la session est partagée) -->
+    <div id="login" class="hidden" style="position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <form id="login-form" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:360px;width:100%;display:grid;gap:10px;">
+            <h2 style="color:var(--gold);">🎮 OnlyFaune – Mini-jeux</h2>
+            <input type="email" id="login-email" placeholder="Email" autocomplete="username" required>
+            <input type="password" id="login-pass" placeholder="Mot de passe" autocomplete="current-password" required>
+            <button type="submit" class="btn btn-primary">Se connecter</button>
+            <p id="login-err" style="color:#ef4444;font-size:.85rem;"></p>
+        </form>
+    </div>
+
+    <header class="header">
+        <h1>🎮 Mini-jeux</h1>
+        <div class="header-right">
+            <span id="chat-pill" class="pill">Chat déconnecté</span>
+            <a href="admin.html" class="btn btn-secondary btn-small">← Admin</a>
+        </div>
+    </header>
+
+    <main>
+        <!-- Chat -->
+        <section class="card">
+            <h2>1. Chat Twitch</h2>
+            <div class="row">
+                <div><label for="channel">Chaîne à écouter</label><input type="text" id="channel" placeholder="renoube"></div>
+                <div><label for="ignore">Pseudos ignorés (bots)</label><input type="text" id="ignore" placeholder="nightbot, streamelements"></div>
+            </div>
+            <div class="btns">
+                <button id="btn-chat" class="btn btn-primary">Se connecter au chat</button>
+            </div>
+            <div id="feed" class="feed"></div>
+            <p class="muted" style="margin-top:8px;">Lecture anonyme du chat : aucun mot de passe Twitch nécessaire. Gardez cette page ouverte pendant les jeux (idéal : dock OBS, voir plus bas).</p>
+        </section>
+
+        <!-- Jeu -->
+        <section class="card">
+            <h2>2. Jeu</h2>
+            <div class="seg" id="seg">
+                <button data-game="devinette" class="active">🔎 Devinette</button>
+                <button data-game="photo">📷 Photo floue</button>
+                <button data-game="duel">⚖️ Plus lourd / grand</button>
+            </div>
+            <div class="row" style="margin-top:12px;">
+                <div><label id="lbl-delay" for="delay">Délai entre indices (s)</label><input type="number" id="delay" min="3" max="120" value="15"></div>
+                <div><label for="cat">Espèces</label>
+                    <select id="cat"><option value="">Toutes</option><option value="bird">Oiseaux</option><option value="mammal">Mammifères</option></select></div>
+                <div><label for="pause">Pause entre manches (s)</label><input type="number" id="pause" min="3" max="120" value="12"></div>
+            </div>
+            <div class="checks">
+                <label><input type="checkbox" id="chain"> Enchaîner automatiquement (phases d'attente)</label>
+                <label><input type="checkbox" id="lb" checked> Classement à côté du jeu</label>
+            </div>
+            <div class="btns">
+                <button id="btn-start" class="btn btn-primary">▶ Lancer une manche</button>
+                <button id="btn-next" class="btn btn-secondary" disabled>⏭ Indice suivant</button>
+                <button id="btn-reveal" class="btn btn-secondary" disabled>👁 Révéler</button>
+                <button id="btn-stop" class="btn btn-danger" disabled>⏹ Arrêter</button>
+            </div>
+        </section>
+
+        <!-- Manche en cours -->
+        <section class="card" id="round-card">
+            <h2>Manche en cours</h2>
+            <p id="round-idle" class="muted">Aucune manche. Lancez-en une ci-dessus.</p>
+            <div id="round-live" class="hidden">
+                <div class="secret">🔒 Réponse (visible de vous seul) : <b id="r-answer"></b></div>
+                <p id="r-info" class="muted"></p>
+                <div class="bar"><div id="r-bar"></div></div>
+                <p id="r-winner" style="margin-top:10px;font-weight:700;"></p>
+            </div>
+        </section>
+
+        <!-- Classement -->
+        <section class="card">
+            <h2>3. Classement global</h2>
+            <table><thead><tr><th>#</th><th>Pseudo</th><th style="text-align:right">Points</th></tr></thead><tbody id="lb-body"></tbody></table>
+            <p id="lb-empty" class="muted">Aucun point pour l'instant.</p>
+            <div class="btns">
+                <button id="btn-lb-show" class="btn btn-secondary">🏆 Afficher le classement à l'écran</button>
+                <button id="btn-lb-refresh" class="btn btn-secondary">↻ Actualiser</button>
+                <button id="btn-lb-reset" class="btn btn-danger">Remettre à zéro</button>
+            </div>
+        </section>
+
+        <!-- OBS -->
+        <section class="card">
+            <h2>4. Ajouter à OBS</h2>
+            <ol class="muted" style="padding-left:18px;display:grid;gap:4px;">
+                <li>OBS → Sources → <b>+</b> → <b>Navigateur</b>.</li>
+                <li>URL : <code id="obs-url"></code> <button id="btn-copy" class="btn btn-secondary btn-small">Copier</button></li>
+                <li>Largeur <b>1920</b>, hauteur <b>1080</b>. Le fond est transparent, rien ne s'affiche tant qu'aucun jeu n'est lancé.</li>
+                <li>Options d'URL : <code>?pos=right</code> (jeu à droite), <code>?lb=off</code> (sans classement).</li>
+                <li>Astuce : <b>Docks → Docks de navigateur personnalisés</b>, ajoutez cette page (<code id="dock-url"></code>) pour piloter les jeux sans quitter OBS.</li>
+            </ol>
+        </section>
+    </main>
+    <div id="toast" class="toast"></div>
+
+    <script src="game-core.js"></script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const GC = window.GameCore;
+        const $ = s => document.querySelector(s);
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const BLURS = [30, 22, 15, 10, 6, 3, 0];            // étapes de la photo qui se dévoile
+        const DEFAULT_DELAY = { devinette: 15, photo: 12, duel: 30 };
+
+        let species = [];
+        let images = {};                // species.id -> url (Wikipédia)
+        let imagesLoaded = false;
+        let scores = [];
+        let game = 'devinette';
+        let round = 0;
+        let cur = null;                 // manche en cours
+        let used = new Set();           // espèces déjà tirées (évite les répétitions)
+        let delays = { ...DEFAULT_DELAY };
+
+        // ── Préférences (facultatif : peut être indisponible) ──
+        const store = {
+            get(k, d) { try { const v = localStorage.getItem('of_jeux_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+            set(k, v) { try { localStorage.setItem('of_jeux_' + k, JSON.stringify(v)); } catch { /* ignoré */ } },
+        };
+
+        function toast(msg) {
+            const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+            clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500);
+        }
+
+        // ── Publication de l'état (lu par game.html dans OBS) ──
+        let pubQueue = Promise.resolve();
+        function publish(gameName, status, payload = {}) {
+            const row = { id: 1, game: gameName, status, round, payload: { lb: $('#lb').checked, ...payload }, updated_at: new Date().toISOString() };
+            pubQueue = pubQueue.then(async () => {
+                const { error } = await supabase.from('game_state').upsert(row);
+                if (error) toast('Erreur publication : ' + error.message + ' (tables créées ? voir supabase-jeux.sql)');
+            });
+        }
+
+        // ── Données ──
+        async function loadSpecies() {
+            const { data, error } = await supabase.from('species').select('*').order('name_fr');
+            if (error) { toast('Erreur espèces : ' + error.message); return; }
+            species = data || [];
+        }
+
+        // Photos Wikipédia (comme le viewer) ; chargées une seule fois, par paquets de 50.
+        async function loadImages() {
+            if (imagesLoaded) return;
+            const entries = species.filter(s => s.source_url).map(s => {
+                const m = s.source_url.match(/\/wiki\/(.+)$/);
+                return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
+            }).filter(Boolean);
+            for (let i = 0; i < entries.length; i += 50) {
+                const batch = entries.slice(i, i + 50);
+                try {
+                    const titles = batch.map(e => e.title).join('|');
+                    const r = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=pageimages&format=json&pithumbsize=800&origin=*`);
+                    const json = await r.json();
+                    const byTitle = {};
+                    for (const p of Object.values(json.query?.pages || {})) if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
+                    for (const e of batch) { const u = byTitle[e.title.replace(/_/g, ' ')]; if (u) images[e.id] = u; }
+                } catch { /* photos facultatives */ }
+            }
+            imagesLoaded = true;
+        }
+
+        async function refreshScores() {
+            const { data, error } = await supabase.from('game_scores').select('*').order('points', { ascending: false }).order('updated_at', { ascending: true }).limit(100);
+            if (error) { $('#lb-empty').textContent = 'Erreur : ' + error.message + ' (tables créées ? voir supabase-jeux.sql)'; return; }
+            scores = data || [];
+            $('#lb-body').innerHTML = scores.slice(0, 15).map((s, i) => `<tr><td class="n">${i + 1}</td><td>${esc(s.display_name)}</td><td class="p">${s.points}</td></tr>`).join('');
+            $('#lb-empty').classList.toggle('hidden', scores.length > 0);
+            $('#lb-empty').textContent = 'Aucun point pour l\'instant.';
+        }
+
+        async function addPoints(list) {
+            const byLogin = new Map(list.map(x => [x.login, x]));
+            if (!byLogin.size) return;
+            const { data } = await supabase.from('game_scores').select('login,points').in('login', [...byLogin.keys()]);
+            const have = Object.fromEntries((data || []).map(r => [r.login, r.points]));
+            const rows = [...byLogin.values()].map(x => ({ login: x.login, display_name: x.display, points: (have[x.login] || 0) + 1, updated_at: new Date().toISOString() }));
+            const { error } = await supabase.from('game_scores').upsert(rows);
+            if (error) toast('Erreur points : ' + error.message);
+            refreshScores();
+        }
+
+        // ── Chat Twitch (IRC anonyme sur WebSocket) ──
+        let ws = null, wantChat = false, chatOk = false;
+        const ignored = () => new Set($('#ignore').value.split(/[\s,]+/).map(s => s.toLowerCase().replace(/^@/, '')).filter(Boolean));
+
+        function setChat(state, label) {
+            const p = $('#chat-pill');
+            p.className = 'pill' + (state === 'on' ? ' on' : state === 'err' ? ' err' : '');
+            p.textContent = label;
+            $('#btn-chat').textContent = wantChat ? 'Se déconnecter du chat' : 'Se connecter au chat';
+        }
+
+        function openChat(channel) {
+            ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+            ws.onopen = () => {
+                ws.send('CAP REQ :twitch.tv/tags');
+                ws.send('PASS SCHMOOPIIE');
+                ws.send('NICK justinfan' + (10000 + Math.floor(Math.random() * 80000)));
+                ws.send('JOIN #' + channel);
+                setChat('', 'Connexion…');
+            };
+            ws.onmessage = e => {
+                for (const line of String(e.data).split('\r\n')) {
+                    if (!line) continue;
+                    if (line.startsWith('PING')) { ws.send('PONG :tmi.twitch.tv'); continue; }
+                    if (line.includes(' JOIN #')) { chatOk = true; setChat('on', 'Chat : #' + channel); continue; }
+                    const msg = GC.parseIrc(line);
+                    if (msg && !ignored().has(msg.login)) onChat(msg);
+                }
+            };
+            ws.onclose = () => {
+                chatOk = false;
+                if (wantChat) { setChat('err', 'Reconnexion…'); setTimeout(() => wantChat && openChat(channel), 3000); }
+                else setChat('', 'Chat déconnecté');
+            };
+            ws.onerror = () => { /* onclose gère la reconnexion */ };
+        }
+
+        $('#btn-chat').onclick = () => {
+            if (wantChat) { wantChat = false; ws && ws.close(); setChat('', 'Chat déconnecté'); return; }
+            const ch = $('#channel').value.trim().replace(/^#/, '').toLowerCase();
+            if (!ch) { toast('Indiquez la chaîne à écouter.'); return; }
+            store.set('channel', ch);
+            wantChat = true; openChat(ch);
+        };
+
+        function feed(msg, cls, note) {
+            const el = document.createElement('div');
+            if (cls) el.className = cls;
+            el.innerHTML = `<b>${esc(msg.display)}</b> ${esc(msg.text.slice(0, 120))}${note ? ' ' + note : ''}`;
+            const f = $('#feed'); f.prepend(el);
+            while (f.children.length > 8) f.lastChild.remove();
+        }
+
+        // ── Moteur de jeu ──
+        const catFilter = () => species.filter(s => !$('#cat').value || s.category === $('#cat').value);
+
+        function pickSpecies(pool) {
+            let avail = pool.filter(s => !used.has(s.id));
+            if (!avail.length) { used.clear(); avail = pool; }
+            const sp = avail[Math.floor(Math.random() * avail.length)];
+            used.add(sp.id);
+            return sp;
+        }
+
+        const delayMs = () => Math.max(3, +$('#delay').value || DEFAULT_DELAY[game]) * 1000;
+        const nowIso = ms => new Date(ms).toISOString();
+
+        async function startRound() {
+            if (!species.length) { toast('Aucune espèce chargée.'); return; }
+            const pool = catFilter();
+            if (pool.length < 2) { toast('Pas assez d\'espèces dans ce filtre.'); return; }
+            $('#btn-start').disabled = true;
+            await loadImages();
+            $('#btn-start').disabled = false;
+            round++;
+            const t = Date.now();
+
+            if (game === 'devinette') {
+                const sp = pickSpecies(pool);
+                const hints = GC.buildHints(sp);
+                cur = { game, sp, aliases: GC.buildAliases(sp, species), status: 'playing', hints, shown: 1, dur: delayMs(), nextAt: t + delayMs(), finalWait: false, winner: null };
+            } else if (game === 'photo') {
+                const withImg = pool.filter(s => images[s.id]);
+                if (!withImg.length) { toast('Aucune photo disponible (Wikipédia injoignable ?).'); round--; return; }
+                const sp = pickSpecies(withImg);
+                cur = { game, sp, aliases: GC.buildAliases(sp, species), status: 'playing', step: 0, dur: delayMs(), nextAt: t + delayMs(), finalWait: false, winner: null };
+            } else {
+                const criterion = Math.random() < 0.5 ? 'weight' : 'size';
+                const d = GC.pickDuel(pool, criterion);
+                if (!d) { toast('Impossible de former un duel avec ce filtre.'); round--; return; }
+                cur = { game, criterion, a: d.a, b: d.b, va: d.va, vb: d.vb, status: 'playing', votes: new Map(), dur: delayMs(), endsAt: t + delayMs(), dirty: false, lastPub: 0 };
+            }
+            publishCurrent();
+            renderRound();
+            updateButtons();
+        }
+
+        function publicPayload() {
+            const c = cur, p = {};
+            if (c.game === 'devinette') {
+                Object.assign(p, { hints: c.hints.slice(0, c.shown), total: c.hints.length, dur: c.dur, next_at: c.status === 'playing' ? nowIso(c.nextAt) : null });
+            } else if (c.game === 'photo') {
+                Object.assign(p, { image: images[c.sp.id], blur: c.status === 'playing' ? BLURS[c.step] : 0, step: c.step + 1, total: BLURS.length, dur: c.dur, next_at: c.status === 'playing' ? nowIso(c.nextAt) : null });
+            } else {
+                const counts = voteCounts();
+                Object.assign(p, {
+                    question: c.criterion === 'weight' ? 'Lequel est le plus lourd ?' : 'Lequel est le plus grand ?',
+                    criterion: c.criterion,
+                    a: { name: c.a.name_fr, image: images[c.a.id] || null },
+                    b: { name: c.b.name_fr, image: images[c.b.id] || null },
+                    votes: counts, dur: c.dur, ends_at: nowIso(c.endsAt),
+                });
+            }
+            if (c.status === 'revealed') {
+                if (c.game === 'duel') {
+                    p.result = { winner: c.va > c.vb ? 'a' : 'b', a: c.criterion === 'weight' ? GC.fmtWeight(c.va) : GC.fmtSize(c.va), b: c.criterion === 'weight' ? GC.fmtWeight(c.vb) : GC.fmtSize(c.vb), correct: c.correct || 0 };
+                } else {
+                    p.answer = { name: c.sp.name_fr, latin: c.sp.name_latin, image: images[c.sp.id] || null };
+                    p.winner = c.winner ? c.winner.display : null;
+                }
+            }
+            return p;
+        }
+        const publishCurrent = () => publish(cur.game, cur.status, publicPayload());
+
+        function voteCounts() {
+            let a = 0, b = 0;
+            for (const v of cur.votes.values()) v === 'a' ? a++ : b++;
+            return { a, b };
+        }
+
+        function advance() {
+            if (!cur || cur.status !== 'playing') return;
+            if (cur.game === 'duel') { revealRound(); return; }
+            const last = cur.game === 'devinette' ? cur.shown >= cur.hints.length : cur.step >= BLURS.length - 1;
+            if (!last) {
+                cur.game === 'devinette' ? cur.shown++ : cur.step++;
+                cur.dur = delayMs(); cur.nextAt = Date.now() + cur.dur;
+                publishCurrent();
+            } else if (!cur.finalWait) {
+                cur.finalWait = true; cur.dur = delayMs(); cur.nextAt = Date.now() + cur.dur;   // dernière chance avant la révélation
+                publishCurrent();
+            } else {
+                revealRound();
+            }
+            renderRound();
+        }
+
+        async function revealRound(winner = null) {
+            if (!cur || cur.status !== 'playing') return;
+            cur.status = 'revealed';
+            cur.chainAt = Date.now() + Math.max(3, +$('#pause').value || 12) * 1000;
+            if (cur.game === 'duel') {
+                const truth = cur.va > cur.vb ? 'a' : 'b';
+                const good = [...cur.votes.entries()].filter(([, v]) => v === truth).map(([login]) => ({ login, display: cur.voters?.get(login) || login }));
+                cur.correct = good.length;
+                await addPoints(good);
+            } else if (winner) {
+                cur.winner = winner;
+                await addPoints([winner]);
+            }
+            if (!cur) return;   // « Arrêter » cliqué pendant l'écriture des points
+            publishCurrent();
+            renderRound(); updateButtons();
+        }
+
+        function onChat(msg) {
+            if (!cur || cur.status !== 'playing') { feed(msg); return; }
+            if (cur.game === 'duel') {
+                const m = msg.text.trim().toLowerCase().match(/^!?\s*(a|b|1|2)\s*$/);
+                if (!m) { feed(msg); return; }
+                cur.voters ||= new Map();
+                cur.voters.set(msg.login, msg.display);
+                cur.votes.set(msg.login, m[1] === 'a' || m[1] === '1' ? 'a' : 'b');
+                cur.dirty = true;
+                feed(msg, 'vote', '🗳');
+                return;
+            }
+            if (GC.matchesAnswer(msg.text, cur.aliases)) { feed(msg, 'hit', '✅'); revealRound({ login: msg.login, display: msg.display }); }
+            else feed(msg);
+        }
+
+        // ── Horloge : dans un Worker pour ne pas être ralentie quand l'onglet est en arrière-plan ──
+        const worker = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),250)'], { type: 'text/javascript' })));
+        worker.onmessage = () => {
+            if (!cur) return;
+            const t = Date.now();
+            if (cur.status === 'playing') {
+                if (cur.game === 'duel') {
+                    if (cur.dirty && t - cur.lastPub > 1200) { cur.dirty = false; cur.lastPub = t; publishCurrent(); renderRound(); }
+                    if (t >= cur.endsAt) revealRound();
+                } else if (t >= cur.nextAt) advance();
+            } else if (cur.status === 'revealed' && $('#chain').checked && t >= cur.chainAt) {
+                cur.chainAt = Infinity;
+                startRound();
+            }
+            renderBar(t);
+        };
+
+        // ── Affichage de la manche (côté admin) ──
+        function renderRound() {
+            $('#round-idle').classList.toggle('hidden', !!cur);
+            $('#round-live').classList.toggle('hidden', !cur);
+            if (!cur) return;
+            const c = cur;
+            let info = '';
+            if (c.game === 'duel') {
+                $('#r-answer').textContent = `${c.va > c.vb ? c.a.name_fr : c.b.name_fr} (${c.criterion === 'weight' ? 'plus lourd' : 'plus grand'})`;
+                const v = voteCounts();
+                info = `A : ${c.a.name_fr}  ·  B : ${c.b.name_fr}  —  votes : A ${v.a} / B ${v.b}`;
+            } else {
+                $('#r-answer').textContent = c.sp.name_fr;
+                info = c.game === 'devinette' ? `Indice ${c.shown}/${c.hints.length}${c.finalWait ? ' (dernière chance)' : ''}` : `Étape ${c.step + 1}/${BLURS.length}${c.finalWait ? ' (dernière chance)' : ''}`;
+            }
+            $('#r-info').textContent = info;
+            $('#r-winner').textContent = c.status === 'revealed'
+                ? (c.game === 'duel' ? `✔ ${c.correct || 0} bonne(s) réponse(s)` : c.winner ? `🏆 ${c.winner.display} a trouvé !` : 'Personne n\'a trouvé.')
+                : '';
+        }
+
+        function renderBar(t) {
+            const c = cur; let pct = 0;
+            if (c && c.status === 'playing') {
+                const end = c.game === 'duel' ? c.endsAt : c.nextAt;
+                pct = Math.max(0, Math.min(100, 100 - ((end - t) / c.dur) * 100));
+            } else if (c && c.status === 'revealed' && $('#chain').checked && isFinite(c.chainAt)) {
+                const total = Math.max(3, +$('#pause').value || 12) * 1000;
+                pct = Math.max(0, Math.min(100, 100 - ((c.chainAt - t) / total) * 100));
+            }
+            $('#r-bar').style.width = pct + '%';
+        }
+
+        function updateButtons() {
+            const playing = cur && cur.status === 'playing';
+            $('#btn-next').disabled = !playing || cur.game === 'duel';
+            $('#btn-reveal').disabled = !playing;
+            $('#btn-stop').disabled = !cur;
+        }
+
+        // ── Boutons ──
+        $('#btn-start').onclick = startRound;
+        $('#btn-next').onclick = advance;
+        $('#btn-reveal').onclick = () => revealRound();
+        $('#btn-stop').onclick = () => {
+            cur = null; round++;
+            publish('idle', 'idle', {});
+            renderRound(); updateButtons(); renderBar(Date.now());
+        };
+        $('#btn-lb-refresh').onclick = refreshScores;
+        $('#btn-lb-show').onclick = async () => {
+            await refreshScores();
+            cur = null; round++;
+            publish('leaderboard', 'playing', {});
+            renderRound(); updateButtons();
+            toast('Classement affiché à l\'écran. « Arrêter » pour le masquer.');
+            $('#btn-stop').disabled = false;
+        };
+        $('#btn-lb-reset').onclick = async () => {
+            if (!confirm('Remettre TOUS les scores à zéro ? Cette action est définitive.')) return;
+            const { error } = await supabase.from('game_scores').delete().neq('login', '');
+            if (error) toast('Erreur : ' + error.message); else { toast('Classement remis à zéro.'); refreshScores(); }
+        };
+        $('#btn-copy').onclick = async () => {
+            try { await navigator.clipboard.writeText($('#obs-url').textContent); toast('URL copiée.'); } catch { toast('Copiez l\'URL à la main.'); }
+        };
+
+        $('#seg').onclick = e => {
+            const b = e.target.closest('button'); if (!b) return;
+            delays[game] = +$('#delay').value || DEFAULT_DELAY[game];
+            game = b.dataset.game;
+            document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('active', x === b));
+            $('#delay').value = delays[game];
+            $('#lbl-delay').textContent = game === 'duel' ? 'Durée du vote (s)' : game === 'photo' ? 'Délai entre étapes (s)' : 'Délai entre indices (s)';
+            store.set('game', game);
+        };
+        for (const id of ['cat', 'pause', 'chain', 'lb', 'ignore']) {
+            $('#' + id).onchange = () => store.set(id, $('#' + id).type === 'checkbox' ? $('#' + id).checked : $('#' + id).value);
+        }
+
+        // ── Démarrage : connexion obligatoire ──
+        async function init() {
+            $('#channel').value = store.get('channel', 'renoube');
+            $('#ignore').value = store.get('ignore', 'nightbot, streamelements, moobot, streamlabs, wizebot');
+            $('#cat').value = store.get('cat', '');
+            $('#pause').value = store.get('pause', 12);
+            $('#chain').checked = store.get('chain', false);
+            $('#lb').checked = store.get('lb', true);
+            const g = store.get('game', 'devinette');
+            $('#seg button[data-game="' + g + '"]')?.click();
+            const base = new URL('game.html', location.href).href;
+            $('#obs-url').textContent = base; $('#dock-url').textContent = location.href.split('#')[0];
+            await Promise.all([loadSpecies(), refreshScores()]);
+        }
+
+        async function boot() {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) { $('#login').classList.add('hidden'); init(); return; }
+            $('#login').classList.remove('hidden');
+        }
+        $('#login-form').onsubmit = async e => {
+            e.preventDefault();
+            const { error } = await supabase.auth.signInWithPassword({ email: $('#login-email').value.trim(), password: $('#login-pass').value });
+            if (error) { $('#login-err').textContent = 'Connexion refusée : ' + error.message; return; }
+            location.reload();
+        };
+        boot();
+    </script>
+</body>
+</html>
