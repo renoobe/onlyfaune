@@ -42,7 +42,8 @@
                     for (const p of Object.values(json.query.pages)) if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
                     for (const e of batch) {
                         const t = byTitle[e.title.replace(/_/g, ' ')];
-                        if (t) thumbs[e.id] = t;
+                        // Wikipédia renvoie désormais thumb.wikimedia.org ; seul upload.wikimedia.org est autorisé dans la CSP Twitch (même chemin).
+                        if (t) thumbs[e.id] = t.replace('https://thumb.wikimedia.org/', 'https://upload.wikimedia.org/');
                     }
                 } catch { /* miniatures facultatives */ }
             }
