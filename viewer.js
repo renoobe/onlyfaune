@@ -16,6 +16,24 @@
     const fmtTime = d => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     const getThumb = sp => thumbs[sp.id] || sp.photo_url || null;
 
+    // Image introuvable ou bloquée : on affiche un emoji (ou rien) plutôt qu'une icône d'image cassée.
+    document.addEventListener('error', e => {
+        const img = e.target;
+        if (!(img instanceof HTMLImageElement) || !img.getAttribute('src')) return;
+        if (img.classList.contains('s-thumb')) {
+            const sp = allSpecies.find(x => x.id === img.closest('.s-card')?.dataset.id);
+            const ph = document.createElement('div');
+            ph.className = 's-thumb-ph';
+            ph.textContent = sp?.category === 'bird' ? '🐦' : '🦊';
+            img.replaceWith(ph);
+        } else if (img.id === 'alert-thumb') {
+            img.style.display = 'none';
+            img.removeAttribute('src');
+        } else {
+            img.remove();
+        }
+    }, true);
+
     // ── Overlay : bouton d'ouverture ──
     if (isOverlay) {
         $('#toggle-btn').onclick = () => {

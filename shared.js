@@ -42,8 +42,8 @@
                     for (const p of Object.values(json.query.pages)) if (p.thumbnail) byTitle[p.title.replace(/_/g, ' ')] = p.thumbnail.source;
                     for (const e of batch) {
                         const t = byTitle[e.title.replace(/_/g, ' ')];
-                        // Wikipédia renvoie désormais thumb.wikimedia.org ; seul upload.wikimedia.org est autorisé dans la CSP Twitch (même chemin).
-                        if (t) thumbs[e.id] = t.replace('https://thumb.wikimedia.org/', 'https://upload.wikimedia.org/');
+                        // Wikipédia sert les miniatures depuis thumb.wikimedia.org : ce domaine doit être dans la liste blanche d'images de l'extension.
+                        if (t) thumbs[e.id] = t;
                     }
                 } catch { /* miniatures facultatives */ }
             }
