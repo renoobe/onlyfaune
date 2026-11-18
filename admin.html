@@ -343,6 +343,12 @@
         <section id="view-new">
             <h2>Nouvelle session d'observation</h2>
 
+            <div id="gta-card" style="background:linear-gradient(135deg,rgba(212,168,66,.14),rgba(64,145,108,.14));border:1px solid var(--gold);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px;">
+                <div style="font-weight:800;color:var(--gold-bright);font-size:1.05rem;">🎮 Session spéciale GTA VI</div>
+                <p style="color:var(--text-dim);font-size:.85rem;margin:6px 0 10px;">Observer toute la faune de Leonida (animaux confirmés par Rockstar). Les fiches manquantes sont créées automatiquement avec leurs photos Wikipédia.</p>
+                <button type="button" id="btn-gta" class="btn btn-primary">🐊 Lancer la session GTA VI</button>
+            </div>
+
             <div class="form-group">
                 <label for="inp-title">Titre de la session</label>
                 <input type="text" id="inp-title" placeholder="Ex : Forêt de Chizé – Aube">
@@ -370,7 +376,7 @@
                     <div style="display:grid;gap:8px;margin-top:10px;">
                         <input type="text" id="sp-name-fr" placeholder="Nom français * (ex : Sarcelle d'hiver)">
                         <input type="text" id="sp-name-latin" placeholder="Nom latin * (ex : Anas crecca)">
-                        <select id="sp-category"><option value="bird">Oiseau</option><option value="mammal">Mammifère</option></select>
+                        <select id="sp-category"><option value="bird">Oiseau</option><option value="mammal">Mammifère</option><option value="reptile">Reptile</option><option value="amphibian">Amphibien</option><option value="fish">Poisson</option><option value="invertebrate">Invertébré</option></select>
                         <input type="text" id="sp-subcategory" list="sp-subcats" placeholder="Groupe (ex : Oiseaux d'eau)">
                         <datalist id="sp-subcats"></datalist>
                         <input type="text" id="sp-wiki" placeholder="Lien Wikipédia FR (optionnel, pour la photo)">
@@ -435,6 +441,7 @@
     </div>
 
     <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="gta6-species.js"></script>
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -493,10 +500,13 @@
         }
 
         // ── Thumbnails (Wikipedia API) ──
+        // Titre Wikipédia d'un lien « …/wiki/Titre » ou « …/w/index.php?title=Titre » (null si absent).
+        const wikiTitle = u => { const m = String(u || '').match(/\/wiki\/([^?#]+)/) || String(u || '').match(/[?&]title=([^&#]+)/); return m ? decodeURIComponent(m[1]) : null; };
+
         async function fetchThumbs() {
             const entries = allSpecies.filter(s => s.source_url).map(s => {
-                const m = s.source_url.match(/\/wiki\/(.+)$/);
-                return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
+                const t = wikiTitle(s.source_url);
+                return t ? { id: s.id, title: t } : null;
             }).filter(Boolean);
             if (!entries.length) return;
 
@@ -553,6 +563,44 @@
             obs = [];
             showActive();
             toast('Session démarrée !');
+        }
+
+        // ── Session spéciale GTA VI : crée les fiches manquantes puis démarre la session avec toute la faune de Leonida ──
+        async function startGtaSession() {
+            const list = window.GTA6_SPECIES;
+            if (!list?.length) { toast('Liste GTA VI introuvable (gta6-species.js)'); return; }
+            if (!confirm(`Lancer la session spéciale GTA VI avec ${list.length} animaux ?\nLes fiches absentes de la base seront créées.`)) return;
+            const btn = $('#btn-gta'); const label = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Préparation des fiches…';
+            try {
+                const byLatin = new Map(allSpecies.map(s => [s.name_latin.toLowerCase(), s]));
+                const ids = [], toInsert = [], toFill = [];
+                for (const g of list) {
+                    const ex = byLatin.get(g.name_latin.toLowerCase());
+                    if (ex) { ids.push(ex.id); if (!g.reuse && !ex.description) toFill.push({ id: ex.id, g }); }   // fiche existante mais vide : on la complète
+                    else if (!g.reuse) toInsert.push(g);
+                }
+                const clean = ({ reuse, ...row }) => ({ ...row, photo_credit: 'Wikimedia Commons' });
+                if (toInsert.length) {
+                    const { data, error } = await supabase.from('species').insert(toInsert.map(clean)).select('id');
+                    if (error) throw error;
+                    ids.push(...data.map(d => d.id));
+                }
+                for (const { id, g } of toFill) {
+                    const { error } = await supabase.from('species').update(clean(g)).eq('id', id);
+                    if (error) throw error;
+                }
+                allSpecies = await loadSpecies();
+                selected = new Set(ids);
+                $('#inp-title').value = '🎮 GTA VI – Safari à Leonida';
+                $('#inp-location').value = 'Leonida (Floride fictive) – GTA VI';
+                loc = { lat: 25.7617, lng: -80.1918 };
+                await startSession();
+            } catch (e) {
+                toast('Erreur : ' + (e.message || e));
+            } finally {
+                btn.disabled = false; btn.textContent = label;
+            }
         }
 
         async function endSession() {
@@ -774,6 +822,7 @@
         // ── Events ──
         function setupEvents() {
             $('#btn-start').onclick = startSession;
+            $('#btn-gta').onclick = startGtaSession;
             $('#btn-end').onclick = endSession;
             $('#btn-update-loc').onclick = updateLocation;
             $('#btn-add-species').onclick = addSpecies;
@@ -919,11 +968,23 @@
             const name_latin = $('#sp-name-latin').value.trim();
             if (!name_fr || !name_latin) { toast('Nom français et latin requis'); return; }
             const wiki = $('#sp-wiki').value.trim();
+            const title = /^https?:\/\/fr\.wikipedia\.org\//.test(wiki) ? wikiTitle(wiki) : null;
+            // Photo enregistrée en base (domaine upload.wikimedia.org, autorisé par l'extension Twitch publiée) :
+            // l'extension n'a ainsi plus besoin d'interroger Wikipédia, dont les miniatures sont désormais sur un autre domaine.
+            let photo_url = null;
+            if (title) {
+                try {
+                    const r = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&format=json&pithumbsize=250&origin=*`);
+                    const p = Object.values((await r.json()).query?.pages || {})[0];
+                    if (p?.thumbnail) photo_url = p.thumbnail.source.replace('https://thumb.wikimedia.org/', 'https://upload.wikimedia.org/').split('?')[0];
+                } catch { /* photo facultative */ }
+            }
             const row = {
                 name_fr, name_latin,
                 category: $('#sp-category').value,
                 subcategory: $('#sp-subcategory').value.trim() || 'Autre',
-                source_url: /^https?:\/\/fr\.wikipedia\.org\/wiki\//.test(wiki) ? wiki : null,
+                source_url: title ? 'https://fr.wikipedia.org/w/index.php?title=' + encodeURIComponent(title.replace(/ /g, '_')) : null,
+                photo_url,
                 photo_credit: 'Wikimedia Commons',
             };
             const { data, error } = await supabase.from('species').insert(row).select().single();

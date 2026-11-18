@@ -107,7 +107,7 @@
     }
 
     function buildHints(sp) {
-        const cat = sp.category === 'bird' ? 'Un oiseau' : 'Un mammifère';
+        const cat = { bird: 'Un oiseau', mammal: 'Un mammifère', reptile: 'Un reptile', amphibian: 'Un amphibien', fish: 'Un poisson', invertebrate: 'Un invertébré' }[sp.category] || 'Un animal';
         const raw = [
             ['Catégorie', cat],
             ['Habitat', sp.habitat],

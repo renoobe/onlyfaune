@@ -110,7 +110,7 @@
             <div class="row" style="margin-top:12px;">
                 <div><label id="lbl-delay" for="delay">Délai entre indices (s)</label><input type="number" id="delay" min="3" max="600" value="45"></div>
                 <div><label for="cat">Espèces</label>
-                    <select id="cat"><option value="">Toutes</option><option value="bird">Oiseaux</option><option value="mammal">Mammifères</option></select></div>
+                    <select id="cat"><option value="">Toutes</option><option value="bird">Oiseaux</option><option value="mammal">Mammifères</option><option value="reptile">Reptiles</option><option value="amphibian">Amphibiens</option><option value="fish">Poissons</option><option value="invertebrate">Invertébrés</option></select></div>
                 <div><label for="fx">Effet photo</label>
                     <select id="fx"><option value="zoom">Dézoom</option><option value="pixel">Pixelisé</option></select></div>
                 <div><label for="pause">Pause entre manches (s)</label><input type="number" id="pause" min="3" max="600" value="45"></div>
@@ -217,12 +217,15 @@
             species = data || [];
         }
 
-        // Photos Wikipédia (comme le viewer) ; chargées une seule fois, par paquets de 50.
+        // Titre Wikipédia d'un lien « …/wiki/Titre » ou « …/w/index.php?title=Titre » (null si absent).
+        const wikiTitle = u => { const m = String(u || '').match(/\/wiki\/([^?#]+)/) || String(u || '').match(/[?&]title=([^&#]+)/); return m ? decodeURIComponent(m[1]) : null; };
+
+        // Photos Wikipédia grand format (800 px) pour les jeux ; chargées une seule fois, par paquets de 50.
         async function loadImages() {
             if (imagesLoaded) return;
             const entries = species.filter(s => s.source_url).map(s => {
-                const m = s.source_url.match(/\/wiki\/(.+)$/);
-                return m ? { id: s.id, title: decodeURIComponent(m[1]) } : null;
+                const t = wikiTitle(s.source_url);
+                return t ? { id: s.id, title: t } : null;
             }).filter(Boolean);
             for (let i = 0; i < entries.length; i += 50) {
                 const batch = entries.slice(i, i + 50);
