@@ -565,22 +565,32 @@
             toast('Session démarrée !');
         }
 
-        // ── Session spéciale GTA VI : crée les fiches manquantes puis démarre la session avec toute la faune de Leonida ──
+        // ── Session spéciale GTA VI : toute la faune « GTA VI » de la base (liste de départ + espèces ajoutées à la main) ──
         async function startGtaSession() {
-            const list = window.GTA6_SPECIES;
-            if (!list?.length) { toast('Liste GTA VI introuvable (gta6-species.js)'); return; }
-            if (!confirm(`Lancer la session spéciale GTA VI avec ${list.length} animaux ?\nLes fiches absentes de la base seront créées.`)) return;
+            const list = window.GTA6_SPECIES || [];
+            if (!list.length) { toast('Liste GTA VI introuvable (gta6-species.js)'); return; }
+            const key = s => s.name_latin.toLowerCase();
+            const isGta = s => (s.subcategory || '').startsWith('GTA VI');
+            // Une seule fiche par nom latin (on garde celle qui a une description) : évite les doublons ajoutés à la main.
+            const chosen = new Map();
+            const consider = s => { const c = chosen.get(key(s)); if (!c || (!c.description && s.description)) chosen.set(key(s), s); };
+            allSpecies.filter(isGta).forEach(consider);                         // tout ce qui est rangé dans un groupe « GTA VI »
+            allSpecies.filter(s => selected.has(s.id)).forEach(consider);       // + la sélection faite à la main
+            const toInsert = [], toFill = [];
+            for (const g of list) {                                             // + la liste de départ (créée si absente)
+                const ex = allSpecies.filter(s => key(s) === g.name_latin.toLowerCase());
+                if (ex.length) { ex.forEach(consider); if (!g.reuse && !ex.some(s => s.description)) toFill.push({ id: ex[0].id, g }); }   // fiche vide : on la complète
+                else if (!g.reuse) toInsert.push(g);
+            }
+            const inList = new Set(list.map(key));
+            const extra = [...chosen.keys()].filter(k => !inList.has(k)).length;
+            const total = chosen.size + toInsert.length;
+            if (!confirm(`Lancer la session spéciale GTA VI avec ${total} animaux ?\n\n• ${total - extra} de la liste de départ\n• ${extra} ajoutés par vous\n\nLes fiches absentes de la base seront créées.`)) return;
             const btn = $('#btn-gta'); const label = btn.textContent;
             btn.disabled = true; btn.textContent = 'Préparation des fiches…';
             try {
-                const byLatin = new Map(allSpecies.map(s => [s.name_latin.toLowerCase(), s]));
-                const ids = [], toInsert = [], toFill = [];
-                for (const g of list) {
-                    const ex = byLatin.get(g.name_latin.toLowerCase());
-                    if (ex) { ids.push(ex.id); if (!g.reuse && !ex.description) toFill.push({ id: ex.id, g }); }   // fiche existante mais vide : on la complète
-                    else if (!g.reuse) toInsert.push(g);
-                }
                 const clean = ({ reuse, ...row }) => ({ ...row, photo_credit: 'Wikimedia Commons' });
+                const ids = [...chosen.values()].map(s => s.id);
                 if (toInsert.length) {
                     const { data, error } = await supabase.from('species').insert(toInsert.map(clean)).select('id');
                     if (error) throw error;
