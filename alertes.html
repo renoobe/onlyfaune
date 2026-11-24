@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFaune – Alertes d'observation (OBS)</title>
+    <!--
+      Source navigateur OBS : 1920 x 1080, fond transparent. Affiche l'alerte « VU ! » à chaque espèce cochée dans l'admin,
+      pour tous les spectateurs (sans extension). Rien ne s'affiche tant qu'il n'y a pas de nouvelle observation.
+      Options d'URL :
+        ?pos=bottom-left | bottom-right | top-left | top-right | center   (défaut : bottom-left)
+        ?duration=8        durée d'affichage en secondes (défaut 8)
+        ?bg=1              damier pour prévisualiser la transparence
+        ?demo=1            alerte d'exemple en boucle (sans base de données)
+    -->
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: calc(100vh / 54); }               /* 1 rem = 20 px en 1080p, s'adapte à la hauteur */
+        body { background: transparent; color: #f2f4f8; overflow: hidden; height: 100vh; font-family: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif; }
+        body.checker { background: #2b2f36 conic-gradient(#3a3f48 25%, #2b2f36 0 50%, #3a3f48 0 75%, #2b2f36 0) 0 0 / 2rem 2rem; }
+
+        #stage { position: fixed; inset: 2.4rem; display: flex; pointer-events: none; }
+        body.pos-bottom-left #stage { align-items: flex-end; justify-content: flex-start; }
+        body.pos-bottom-right #stage { align-items: flex-end; justify-content: flex-end; }
+        body.pos-top-left #stage { align-items: flex-start; justify-content: flex-start; }
+        body.pos-top-right #stage { align-items: flex-start; justify-content: flex-end; }
+        body.pos-center #stage { align-items: center; justify-content: center; }
+
+        .alert {
+            display: flex; align-items: center; gap: 1.4rem; width: 34rem; padding: 1.1rem 1.6rem 1.1rem 1.1rem;
+            background: rgba(13, 17, 23, .94); border: .16rem solid #d4a842; border-radius: 1.3rem;
+            box-shadow: 0 .8rem 2.6rem rgba(0, 0, 0, .5), 0 0 2.2rem rgba(212, 168, 66, .35);
+            opacity: 0; transform: translateY(2rem) scale(.94); transition: opacity .45s ease, transform .55s cubic-bezier(.2, .9, .3, 1.25);
+        }
+        .alert.show { opacity: 1; transform: none; }
+        body.pos-top-left .alert, body.pos-top-right .alert { transform: translateY(-2rem) scale(.94); }
+        body.pos-top-left .alert.show, body.pos-top-right .alert.show { transform: none; }
+
+        .pic { flex: none; width: 9rem; height: 9rem; border-radius: 1rem; overflow: hidden; background: #1c2333; border: .14rem solid rgba(212, 168, 66, .7); display: grid; place-items: center; font-size: 4rem; }
+        .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .txt { min-width: 0; }
+        .tag { font-size: 1.1rem; font-weight: 900; letter-spacing: .28em; text-transform: uppercase; color: #f0c850; }
+        .tag.again { color: #9aa4b2; }
+        .name { margin-top: .15rem; font-size: 2rem; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+        .latin { margin-top: .2rem; font-size: 1.05rem; font-style: italic; color: #9aa4b2; overflow-wrap: anywhere; }
+        .count { margin-top: .55rem; display: inline-block; padding: .15rem .7rem; font-size: .95rem; font-weight: 700; color: #0d1117; background: #d4a842; border-radius: 2rem; }
+        .alert.show .tag { animation: pulse 1.2s ease-out 1; }
+        @keyframes pulse { 0% { text-shadow: 0 0 0 rgba(240, 200, 80, 0); } 40% { text-shadow: 0 0 1.4rem rgba(240, 200, 80, .95); } 100% { text-shadow: 0 0 0 rgba(240, 200, 80, 0); } }
+    </style>
+</head>
+<body>
+    <div id="stage"><div id="alert" class="alert"></div></div>
+
+    <script>
+    (function () {
+        'use strict';
+        const SUPABASE_URL = 'https://czdkqsvzvldcjmyqrsxz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZGtxc3Z6dmxkY2pteXFyc3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2ODM2OTYsImV4cCI6MjEwNTI1OTY5Nn0.dmMrP7xtrJx0xB59uEmc8hkoW26IOwfwJC5LVYvxddo';
+        const POLL_MS = 2000;
+
+        const q = new URLSearchParams(location.search);
+        const POS = ['bottom-left', 'bottom-right', 'top-left', 'top-right', 'center'].includes(q.get('pos')) ? q.get('pos') : 'bottom-left';
+        const DURATION = Math.max(3, +q.get('duration') || 8) * 1000;
+        document.body.classList.add('pos-' + POS);
+        document.body.classList.toggle('checker', q.has('bg'));
+
+        const el = document.getElementById('alert');
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const safeUrl = u => (/^https:\/\//.test(u || '') ? esc(u) : '');
+        const EMOJI = { bird: '🐦', mammal: '🦊', reptile: '🐊', amphibian: '🐸', fish: '🐟', invertebrate: '🦀' };
+        const rest = async path => {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+        };
+
+        // ── Affichage d'une alerte, une à la fois (file d'attente) ──
+        const queue = [];
+        let busy = false;
+
+        function render(a) {
+            const sp = a.species || {};
+            const img = safeUrl(sp.photo_url);
+            el.innerHTML = `<div class="pic">${img ? `<img src="${img}" alt="">` : (EMOJI[sp.category] || '🐾')}</div>
+                <div class="txt"><div class="tag${a.again ? ' again' : ''}">${a.again ? 'Encore vu' : 'Vu !'}</div>
+                <div class="name">${esc(sp.name_fr)}</div><div class="latin">${esc(sp.name_latin)}</div>
+                ${a.total ? `<span class="count">${a.count} / ${a.total} espèces</span>` : ''}</div>`;
+            const im = el.querySelector('img');
+            if (im) im.onerror = () => { im.replaceWith(Object.assign(document.createElement('span'), { textContent: EMOJI[sp.category] || '🐾' })); };
+        }
+
+        async function pump() {
+            if (busy || !queue.length) return;
+            busy = true;
+            const a = queue.shift();
+            render(a);
+            void el.offsetWidth;                                    // relance l'animation d'entrée
+            el.classList.add('show');
+            await new Promise(r => setTimeout(r, queue.length > 2 ? Math.min(DURATION, 4500) : DURATION));   // file longue : on accélère
+            el.classList.remove('show');
+            await new Promise(r => setTimeout(r, 700));
+            busy = false;
+            pump();
+        }
+        const push = a => { queue.push(a); pump(); };
+
+        // ── Lecture des observations de la session active ──
+        let sessionId = null, known = new Set(), seen = new Set(), total = 0, baseline = true;
+        const SELECT = 'id,species_id,observed_at,species:species_id(name_fr,name_latin,photo_url,category)';
+
+        async function poll() {
+            try {
+                const [s] = await rest('observation_sessions?select=id&is_active=eq.true&order=created_at.desc&limit=1');
+                if (!s) { sessionId = null; return; }
+                if (s.id !== sessionId) {                           // nouvelle session : on repart d'une base vierge, sans rejouer l'existant
+                    sessionId = s.id; baseline = true; known = new Set(); seen = new Set();
+                    total = (await rest(`session_species?select=species_id&session_id=eq.${s.id}`)).length;
+                }
+                const obs = await rest(`observations?select=${SELECT}&session_id=eq.${s.id}&order=observed_at.desc&limit=${baseline ? 1000 : 30}`);
+                if (baseline) { obs.forEach(o => { known.add(o.id); seen.add(o.species_id); }); baseline = false; return; }
+                for (const o of obs.filter(o => !known.has(o.id)).reverse()) {      // dans l'ordre chronologique
+                    known.add(o.id);
+                    const again = seen.has(o.species_id);
+                    seen.add(o.species_id);
+                    push({ species: o.species, again, count: seen.size, total });
+                }
+            } catch (e) { /* on réessaie au prochain tour */ }
+        }
+
+        // ── Mode démo ──
+        if (q.has('demo')) {
+            const img = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/%D0%9B%D0%B0%D0%B7%D0%BE%D1%80%D0%B5%D0%B2%D0%BA%D0%B0_%28Cyanistes_caeruleus%29%2C_%D0%91%D0%B8%D1%82%D1%86%D0%B5%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BB%D0%B5%D1%81.jpg/250px-%D0%9B%D0%B0%D0%B7%D0%BE%D1%80%D0%B5%D0%B2%D0%BA%D0%B0_%28Cyanistes_caeruleus%29%2C_%D0%91%D0%B8%D1%82%D1%86%D0%B5%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BB%D0%B5%D1%81.jpg';
+            const demo = [{ species: { name_fr: 'Alligator d\'Amérique', name_latin: 'Alligator mississippiensis', photo_url: img, category: 'reptile' }, again: false, count: 12, total: 143 },
+                { species: { name_fr: 'Mésange bleue', name_latin: 'Cyanistes caeruleus', photo_url: null, category: 'bird' }, again: true, count: 12, total: 143 }];
+            let i = 0; const next = () => { push(demo[i++ % demo.length]); setTimeout(next, DURATION + 2500); }; next();
+        } else {
+            poll(); setInterval(poll, POLL_MS);
+        }
+    })();
+    </script>
+</body>
+</html>

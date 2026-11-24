@@ -159,6 +159,7 @@
                 <li>URL : <code id="obs-url"></code> <button id="btn-copy" class="btn btn-secondary btn-small">Copier</button></li>
                 <li>Largeur <b>1920</b>, hauteur <b>1080</b>. Le fond est transparent, rien ne s'affiche tant qu'aucun jeu n'est lancé.</li>
                 <li>Options d'URL : <code>?pos=right</code> (jeu à droite), <code>?lb=off</code> (sans classement).</li>
+                <li><b>Alertes « VU ! »</b> pour tous les spectateurs (même sans l'extension) : ajoutez une 2e source navigateur avec <code id="alert-url"></code> (1920×1080, options : <code>?pos=bottom-right</code>, <code>?duration=10</code>).</li>
                 <li>Astuce : <b>Docks → Docks de navigateur personnalisés</b>, ajoutez cette page (<code id="dock-url"></code>) pour piloter les jeux sans quitter OBS.</li>
             </ol>
         </section>
@@ -553,6 +554,7 @@
             const g = store.get('game', 'devinette');
             $('#seg button[data-game="' + g + '"]')?.click();
             const base = new URL('game.html', location.href).href;
+            $('#alert-url').textContent = new URL('alertes.html', location.href).href;
             $('#obs-url').textContent = base; $('#dock-url').textContent = location.href.split('#')[0];
             await Promise.all([loadSpecies(), refreshScores()]);
         }
